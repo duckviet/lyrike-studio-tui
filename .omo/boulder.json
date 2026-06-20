@@ -1,0 +1,14 @@
+{
+  "schema_version": 2,
+  "active_work_id": "lyrike-studio-tui-ulw",
+  "works": {
+    "lyrike-studio-tui-ulw": {
+      "work_id": "lyrike-studio-tui-ulw",
+      "active_plan": ".omo/plans/lyrike-studio-tui.md",
+      "plan_name": "lyrike-studio-tui",
+      "session_ids": ["codex:019ee58b-8546-7c63-b27a-da3d5c8d8b4f"],
+      "status": "active",
+      "worktree_path": null
+    }
+  }
+}
