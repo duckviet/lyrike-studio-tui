@@ -13,124 +13,42 @@ import (
 )
 
 func (m Model) updateKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
-	if msg.Code == tea.KeyTab {
-		if msg.Mod == tea.ModShift {
-			m.focus = m.prevFocus()
-		} else {
-			m.focus = m.nextFocus()
-		}
-		return m, nil
-	}
+	msg = normalizeKeyPress(msg)
 
-	if msg.Code == tea.KeySpace || msg.Code == ' ' {
-		if m.focus == focusEditor && m.editor.Editing {
-			var cmd tea.Cmd
-			snap := m.player.Snapshot()
-			m.editor = m.editor.WithTapPosition(snap.Position)
-			m.editor, cmd = m.editor.Update(msg)
-			return m, cmd
-		}
-		if m.player != nil {
-			snap := m.player.Snapshot()
-			if snap.State == playback.StatePlaying {
-				_, _ = m.player.Pause()
-				m.status = []string{"playback paused"}
-			} else {
-				_, _ = m.player.Play()
-				m.status = []string{"playback playing"}
-			}
-		}
-		return m, nil
+	if action := globalKeyAction(msg); action != keyActionNone {
+		return m.applyRootKeyAction(action)
 	}
-
-	if msg.Code == tea.KeyLeft {
-		if m.focus == focusEditor && m.editor.Editing {
-			var cmd tea.Cmd
-			snap := m.player.Snapshot()
-			m.editor = m.editor.WithTapPosition(snap.Position)
-			m.editor, cmd = m.editor.Update(msg)
-			return m, cmd
-		}
-		if m.player != nil {
-			snap := m.player.Snapshot()
-			newPos := max(0, snap.Position.Milliseconds()-1000)
-			pos, _ := playback.NewPosition(newPos)
-			_, _ = m.player.Seek(pos)
-			m.editor = m.editor.WithPlaybackPosition(newPos)
-			m.status = []string{fmt.Sprintf("seek: %dms", newPos)}
-		}
-		return m, nil
+	if m.editorEditModeOwnsKey() {
+		return m.updateFocusedPanel(msg)
 	}
-
-	if msg.Code == tea.KeyRight {
-		if m.focus == focusEditor && m.editor.Editing {
-			var cmd tea.Cmd
-			snap := m.player.Snapshot()
-			m.editor = m.editor.WithTapPosition(snap.Position)
-			m.editor, cmd = m.editor.Update(msg)
-			return m, cmd
-		}
-		if m.player != nil {
-			snap := m.player.Snapshot()
-			newPos := min(snap.Duration.Milliseconds(), snap.Position.Milliseconds()+1000)
-			pos, _ := playback.NewPosition(newPos)
-			_, _ = m.player.Seek(pos)
-			m.editor = m.editor.WithPlaybackPosition(newPos)
-			m.status = []string{fmt.Sprintf("seek: %dms", newPos)}
-		}
-		return m, nil
+	if action := nonEditingRootKeyAction(msg); action != keyActionNone {
+		return m.applyRootKeyAction(action)
 	}
+	return m.updateFocusedPanel(msg)
+}
 
-	if msg.Code == 's' && msg.Mod == tea.ModCtrl {
-		store := storage.NewDefaultStore()
-		doc := m.editor.Document
-		idStr := m.videoID
-		if idStr == "" {
-			idStr = "default"
-		}
-		id, _ := draft.NewDraftID(idStr)
-		
-		track := m.trackName
-		if track == "" {
-			track = "Unknown Track"
-		}
-		artist := m.artistName
-		if artist == "" {
-			artist = "Unknown Artist"
-		}
-		
-		snap := draft.Snapshot{
-			ID: id,
-			Metadata: draft.Metadata{
-				VideoID:    m.videoID,
-				TrackName:  track,
-				ArtistName: artist,
-				Duration:   int(m.player.Snapshot().Duration.Milliseconds() / 1000),
-				UpdatedAt:  time.Now(),
-			},
-			Document: doc,
-		}
-		err := store.Save(snap)
-		if err == nil {
-			m.status = []string{"draft save complete"}
-		} else {
-			m.status = []string{"draft save failed: " + err.Error()}
-		}
-		return m, nil
-	}
-
-	if msg.Code == 'q' {
-		if m.focus == focusEditor && m.editor.Editing {
-			var cmd tea.Cmd
-			snap := m.player.Snapshot()
-			m.editor = m.editor.WithTapPosition(snap.Position)
-			m.editor, cmd = m.editor.Update(msg)
-			return m, cmd
-		}
+func (m Model) applyRootKeyAction(action keyAction) (tea.Model, tea.Cmd) {
+	switch action {
+	case keyActionFocusNext:
+		m.focus = m.nextFocus()
+	case keyActionFocusPrev:
+		m.focus = m.prevFocus()
+	case keyActionSaveDraft:
+		m = m.saveDraft()
+	case keyActionTogglePlayback:
+		m = m.togglePlayback()
+	case keyActionSeekBackward:
+		m = m.seekPlayback(-1000)
+	case keyActionSeekForward:
+		m = m.seekPlayback(1000)
+	case keyActionQuit:
 		m.status = []string{"quit ready"}
 		return m, tea.Quit
 	}
+	return m, nil
+}
 
+func (m Model) updateFocusedPanel(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	var cmd tea.Cmd
 	switch m.focus {
 	case focusMedia:
@@ -153,6 +71,77 @@ func (m Model) updateKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		m.publish, cmd = m.publish.Update(msg)
 	}
 	return m, cmd
+}
+
+func (m Model) togglePlayback() Model {
+	if m.player == nil {
+		return m
+	}
+	snap := m.player.Snapshot()
+	if snap.State == playback.StatePlaying {
+		_, _ = m.player.Pause()
+		m.status = []string{"playback paused"}
+	} else {
+		_, _ = m.player.Play()
+		m.status = []string{"playback playing"}
+	}
+	return m
+}
+
+func (m Model) seekPlayback(deltaMS int64) Model {
+	if m.player == nil {
+		return m
+	}
+	snap := m.player.Snapshot()
+	newPos := snap.Position.Milliseconds() + deltaMS
+	newPos = max(0, min(snap.Duration.Milliseconds(), newPos))
+	pos, _ := playback.NewPosition(newPos)
+	_, _ = m.player.Seek(pos)
+	m.editor = m.editor.WithPlaybackPosition(newPos)
+	m.status = []string{fmt.Sprintf("seek: %dms", newPos)}
+	return m
+}
+
+func (m Model) saveDraft() Model {
+	store := storage.NewDefaultStore()
+	doc := m.editor.Document
+	idStr := m.videoID
+	if idStr == "" {
+		idStr = "default"
+	}
+	id, _ := draft.NewDraftID(idStr)
+
+	track := m.trackName
+	if track == "" {
+		track = "Unknown Track"
+	}
+	artist := m.artistName
+	if artist == "" {
+		artist = "Unknown Artist"
+	}
+
+	durationSeconds := 0
+	if m.player != nil {
+		durationSeconds = int(m.player.Snapshot().Duration.Milliseconds() / 1000)
+	}
+	snap := draft.Snapshot{
+		ID: id,
+		Metadata: draft.Metadata{
+			VideoID:    m.videoID,
+			TrackName:  track,
+			ArtistName: artist,
+			Duration:   durationSeconds,
+			UpdatedAt:  time.Now(),
+		},
+		Document: doc,
+	}
+	err := store.Save(snap)
+	if err == nil {
+		m.status = []string{"draft save complete"}
+	} else {
+		m.status = []string{"draft save failed: " + err.Error()}
+	}
+	return m
 }
 
 func (m Model) nextFocus() focus {

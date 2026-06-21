@@ -4,6 +4,8 @@ import (
 	"regexp"
 	"strings"
 	"testing"
+
+	"github.com/duckviet/lyrike-studio-tui/internal/domain/lyrics"
 )
 
 var ansiRegexp = regexp.MustCompile(`\x1b\[[0-9;]*[a-zA-Z]`)
@@ -54,3 +56,29 @@ func TestWaveformClampsLoopBounds(t *testing.T) {
 		t.Fatalf("View() = %q, want position clamped to the final cell", got)
 	}
 }
+
+func TestWaveformRenderLyricTrack(t *testing.T) {
+	t.Parallel()
+
+	start, _ := lyrics.NewTimestamp(2000)
+	end, _ := lyrics.NewTimestamp(8000)
+	txt, _ := lyrics.NewText("abc")
+	line, _ := lyrics.NewLine(start, end, txt)
+
+	panel := NewPanelWithPeaks([]float64{0.5}, 10_000).
+		WithLines([]lyrics.Line{line}).
+		WithPosition(5000)
+
+	gotRaw := panel.renderLyricTrack(11)
+	got := stripAnsi(gotRaw)
+	want := "  │ abc │  "
+
+	if got != want {
+		t.Fatalf("renderLyricTrack() = %q, want %q", got, want)
+	}
+
+	if !strings.Contains(gotRaw, "\x1b[") {
+		t.Fatalf("expected styled/ANSI color codes in output, got %q", gotRaw)
+	}
+}
+

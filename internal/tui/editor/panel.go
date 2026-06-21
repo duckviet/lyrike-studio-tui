@@ -36,11 +36,11 @@ var helpLines = []string{
 	"Navigation:",
 	"  Tab / Shift-Tab : Focus next/prev panel",
 	"  j / k           : Move selection down/up",
-	"  Up / Down       : Move selection down/up",
+	"  Down / Up       : Move selection down/up",
 	"",
 	"Playback:",
-	"  Space           : Play / Pause",
-	"  Left / Right    : Seek backward/forward 1s",
+	"  Space           : Play / Pause outside text edit",
+	"  Left / Right    : Seek backward/forward 1s outside text edit",
 	"",
 	"Editing Lyrics:",
 	"  e               : Edit current line text",
@@ -163,7 +163,7 @@ func (p Panel) View(_ int, height int) string {
 	var builder strings.Builder
 	for index := startIdx; index < endIdx; index++ {
 		line := lines[index]
-		
+
 		marker := "  "
 		if index == p.selected {
 			marker = "> "
@@ -240,46 +240,71 @@ func (p Panel) redo() Panel {
 	return p
 }
 
-func (p Panel) getInsertTimes(idx int) (int64, int64, bool) {
+func (p Panel) makeInsertGap(idx int) (Panel, int64, int64) {
 	lines := p.Document.Lines()
 	if len(lines) == 0 {
 		start := p.tapPosition.Milliseconds()
-		return start, start + 3000, true
+		return p, start, start + 3000
 	}
 
-	var minStart int64 = 0
-	if idx > 0 {
-		minStart = lines[idx-1].End().Milliseconds()
-	}
-
-	var maxEnd int64 = -1
-	if idx < len(lines) {
-		maxEnd = lines[idx].Start().Milliseconds()
-	}
-
-	startMS := p.tapPosition.Milliseconds()
-	if startMS < minStart {
-		startMS = minStart
-	}
-
-	var endMS int64
-	if maxEnd != -1 {
-		if startMS >= maxEnd {
-			if maxEnd-minStart >= 2 {
-				startMS = minStart
-				endMS = maxEnd
-			} else {
-				return 0, 0, false
-			}
-		} else {
-			endMS = startMS + 3000
-			if endMS > maxEnd {
-				endMS = maxEnd
-			}
+	// Case 1: Inserting at the beginning (idx == 0)
+	if idx == 0 {
+		nextStart := lines[0].Start().Milliseconds()
+		if nextStart >= 1000 {
+			return p, nextStart - 1000, nextStart
 		}
-	} else {
-		endMS = startMS + 3000
+		// Shift nextStart to 1000 to make room
+		ts, _ := lyrics.NewTimestamp(1000)
+		p = p.apply(history.SetStart{Index: 0, Start: ts})
+		return p, 0, 1000
 	}
 
-	return startMS, endMS, true
+	// Case 2: Inserting at the end (idx == len(lines))
+	if idx == len(lines) {
+		prevEnd := lines[idx-1].End().Milliseconds()
+		return p, prevEnd, prevEnd + 3000
+	}
+
+	// Case 3: Inserting in between (0 < idx < len(lines))
+	minStart := lines[idx-1].End().Milliseconds()
+	maxEnd := lines[idx].Start().Milliseconds()
+
+	if maxEnd-minStart >= 1000 {
+		// Gap is already large enough
+		return p, minStart, maxEnd
+	}
+
+	// We need to create a gap of at least 1000ms.
+	// Try to shrink previous line's end first.
+	prevStart := lines[idx-1].Start().Milliseconds()
+	if minStart-prevStart > 1000 {
+		newEnd := minStart - 1000
+		ts, _ := lyrics.NewTimestamp(newEnd)
+		p = p.apply(history.SetEnd{Index: idx - 1, End: ts})
+		return p, newEnd, maxEnd
+	}
+
+	// Shift next line's start if possible.
+	nextEnd := lines[idx].End().Milliseconds()
+	if nextEnd-maxEnd > 1000 {
+		newStart := maxEnd + 1000
+		ts, _ := lyrics.NewTimestamp(newStart)
+		p = p.apply(history.SetStart{Index: idx, Start: ts})
+		return p, minStart, newStart
+	}
+
+	// Split the difference or create a tiny gap.
+	newEnd := minStart - 200
+	if newEnd < prevStart {
+		newEnd = prevStart + 1
+	}
+	newStart := maxEnd + 200
+	if newStart > nextEnd {
+		newStart = nextEnd - 1
+	}
+	ts1, _ := lyrics.NewTimestamp(newEnd)
+	p = p.apply(history.SetEnd{Index: idx - 1, End: ts1})
+	ts2, _ := lyrics.NewTimestamp(newStart)
+	p = p.apply(history.SetStart{Index: idx, Start: ts2})
+	return p, newEnd, newStart
 }

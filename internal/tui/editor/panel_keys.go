@@ -8,6 +8,8 @@ import (
 )
 
 func (p Panel) handleKey(key tea.KeyPressMsg) (Panel, tea.Cmd) {
+	key = normalizeKeyPress(key)
+
 	if p.ShowHelp {
 		if key.Code == tea.KeyDown || key.Code == 'j' {
 			p.helpScroll++
@@ -93,10 +95,12 @@ func (p Panel) handleKey(key tea.KeyPressMsg) (Panel, tea.Cmd) {
 	case key.Code == tea.KeyDown || key.Code == 'j':
 		if len(p.Document.Lines()) > 0 {
 			p.selected = min(p.selected+1, len(p.Document.Lines())-1)
+			return p, p.seekToSelectedCmd()
 		}
 	case key.Code == tea.KeyUp || key.Code == 'k':
 		if len(p.Document.Lines()) > 0 {
 			p.selected = max(p.selected-1, 0)
+			return p, p.seekToSelectedCmd()
 		}
 	case key.Code == 'J' && key.Mod == tea.ModShift: // Swap text down
 		if p.selected+1 < len(p.Document.Lines()) {
@@ -117,36 +121,34 @@ func (p Panel) handleKey(key tea.KeyPressMsg) (Panel, tea.Cmd) {
 		return p, nil
 	case key.Code == 'i': // Insert before selected
 		idx := p.selected
-		startMS, endMS, ok := p.getInsertTimes(idx)
-		if ok {
-			ts, _ := lyrics.NewTimestamp(startMS)
-			te, _ := lyrics.NewTimestamp(endMS)
-			txt, _ := lyrics.NewText("")
-			line, _ := lyrics.NewLine(ts, te, txt)
-			p = p.apply(history.InsertLine{Index: idx, Line: line})
-			p.selected = idx
-			p.Editing = true
-			p.InputText = ""
-			p.cursorPos = 0
-		}
+		var startMS, endMS int64
+		p, startMS, endMS = p.makeInsertGap(idx)
+		ts, _ := lyrics.NewTimestamp(startMS)
+		te, _ := lyrics.NewTimestamp(endMS)
+		txt, _ := lyrics.NewText("")
+		line, _ := lyrics.NewLine(ts, te, txt)
+		p = p.apply(history.InsertLine{Index: idx, Line: line})
+		p.selected = idx
+		p.Editing = true
+		p.InputText = ""
+		p.cursorPos = 0
 		return p, nil
 	case key.Code == 'a' || key.Code == 'o' || key.Code == tea.KeyEnter: // Insert after selected
 		idx := p.selected + 1
 		if len(p.Document.Lines()) == 0 {
 			idx = 0
 		}
-		startMS, endMS, ok := p.getInsertTimes(idx)
-		if ok {
-			ts, _ := lyrics.NewTimestamp(startMS)
-			te, _ := lyrics.NewTimestamp(endMS)
-			txt, _ := lyrics.NewText("")
-			line, _ := lyrics.NewLine(ts, te, txt)
-			p = p.apply(history.InsertLine{Index: idx, Line: line})
-			p.selected = idx
-			p.Editing = true
-			p.InputText = ""
-			p.cursorPos = 0
-		}
+		var startMS, endMS int64
+		p, startMS, endMS = p.makeInsertGap(idx)
+		ts, _ := lyrics.NewTimestamp(startMS)
+		te, _ := lyrics.NewTimestamp(endMS)
+		txt, _ := lyrics.NewText("")
+		line, _ := lyrics.NewLine(ts, te, txt)
+		p = p.apply(history.InsertLine{Index: idx, Line: line})
+		p.selected = idx
+		p.Editing = true
+		p.InputText = ""
+		p.cursorPos = 0
 		return p, nil
 	case key.Code == 'd':
 		if len(p.Document.Lines()) > 0 {
@@ -221,4 +223,26 @@ func (p Panel) handleKey(key tea.KeyPressMsg) (Panel, tea.Cmd) {
 		p = p.apply(history.NudgeEnd{Index: p.selected, DeltaMS: 10})
 	}
 	return p, nil
+}
+
+func normalizeKeyPress(key tea.KeyPressMsg) tea.KeyPressMsg {
+	if key.Code == 0 && key.Mod == 0 {
+		runes := []rune(key.Text)
+		if len(runes) == 1 {
+			key.Code = runes[0]
+		}
+	}
+	return key
+}
+
+type SeekToMSMsg int64
+
+func (p Panel) seekToSelectedCmd() tea.Cmd {
+	if p.selected >= 0 && p.selected < len(p.Document.Lines()) {
+		line := p.Document.Lines()[p.selected]
+		return func() tea.Msg {
+			return SeekToMSMsg(line.Start().Milliseconds())
+		}
+	}
+	return nil
 }

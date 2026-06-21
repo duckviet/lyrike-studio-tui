@@ -21,27 +21,35 @@ var (
 			BorderForeground(lipgloss.Color("#555555"))
 )
 
+func calculateLayout(width, height int, statusLen int) (topHeight, wfHeight, leftW, rightW, availableHeight int) {
+	availableHeight = height
+	if statusLen > 0 {
+		availableHeight--
+	}
+
+	wfHeight = availableHeight * 2 / 5
+	if wfHeight < 8 {
+		wfHeight = 8
+	}
+	if wfHeight > 16 {
+		wfHeight = 16
+	}
+	if availableHeight-wfHeight < 6 && availableHeight >= 14 {
+		wfHeight = availableHeight - 6
+	}
+	topHeight = availableHeight - wfHeight
+
+	leftW = width / 3
+	rightW = width - leftW
+	return
+}
+
 func renderLayout(m Model) string {
 	if m.width == 0 || m.height == 0 {
 		return "Loading..."
 	}
 
-	availableHeight := m.height
-	if len(m.status) > 0 {
-		availableHeight--
-	}
-
-	wfHeight := availableHeight / 3
-	if wfHeight < 6 {
-		wfHeight = 6
-	}
-	if wfHeight > 12 {
-		wfHeight = 12
-	}
-	topHeight := availableHeight - wfHeight
-
-	leftW := m.width / 3
-	rightW := m.width - leftW
+	topHeight, wfHeight, leftW, rightW, _ := calculateLayout(m.width, m.height, len(m.status))
 
 	left := renderMediaPanel(m.media, leftW, topHeight, m.focus == focusMedia)
 
@@ -52,7 +60,7 @@ func renderLayout(m Model) string {
 		right = renderLyricsPanel(m.editor, rightW, topHeight, m.focus == focusEditor)
 	}
 
-	bottom := renderWaveformPanel(m.waveform, m.width, wfHeight, m.focus == focusWaveform)
+	bottom := renderWaveformPanel(m.waveform.WithLines(m.editor.Document.Lines()), m.width, wfHeight, m.focus == focusWaveform)
 
 	topRow := lipgloss.JoinHorizontal(lipgloss.Top, left, right)
 	layout := lipgloss.JoinVertical(lipgloss.Left, topRow, bottom)
@@ -63,6 +71,7 @@ func renderLayout(m Model) string {
 	}
 	return layout + "\n" + strings.Join(status, " | ")
 }
+
 
 func renderMediaPanel(p media.Panel, width, height int, focused bool) string {
 	style := normalBorder

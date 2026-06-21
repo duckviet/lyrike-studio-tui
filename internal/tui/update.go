@@ -61,6 +61,20 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.waveform = waveform.NewPanelWithPeaks(msg.resp.Peaks, int64(msg.resp.Duration)*1000)
 		return m, nil
 
+	case editor.SeekToMSMsg:
+		if m.player != nil {
+			pos, _ := playback.NewPosition(int64(msg))
+			snap, _ := m.player.Seek(pos)
+			state := media.TransportPaused
+			if snap.State == playback.StatePlaying {
+				state = media.TransportPlaying
+			}
+			m.media = m.media.WithTransport(state, snap.Position.Milliseconds(), snap.Duration.Milliseconds())
+			m.waveform = m.waveform.WithPosition(snap.Position.Milliseconds())
+			m.editor = m.editor.WithPlaybackPosition(snap.Position.Milliseconds())
+		}
+		return m, nil
+
 	case tickMsg:
 		var cmd tea.Cmd
 		if m.player != nil {
@@ -73,7 +87,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.media = m.media.WithTransport(state, snapshot.Position.Milliseconds(), snapshot.Duration.Milliseconds())
 				m.waveform = m.waveform.WithPosition(snapshot.Position.Milliseconds())
 				m.editor = m.editor.WithPlaybackPosition(snapshot.Position.Milliseconds())
-				m = m.followActiveLine(snapshot.Position.Milliseconds())
+				if snapshot.State == playback.StatePlaying {
+					m = m.followActiveLine(snapshot.Position.Milliseconds())
+				}
 			}
 		}
 		return m, tea.Batch(tickCmd(), cmd)
@@ -189,21 +205,7 @@ func (m Model) handleMouse(msg tea.MouseMsg) Model {
 	x := mouse.X
 	y := mouse.Y
 
-	availableHeight := m.height
-	if len(m.status) > 0 {
-		availableHeight--
-	}
-
-	wfHeight := availableHeight / 3
-	if wfHeight < 6 {
-		wfHeight = 6
-	}
-	if wfHeight > 12 {
-		wfHeight = 12
-	}
-	topHeight := availableHeight - wfHeight
-
-	leftW := m.width / 3
+	topHeight, _, leftW, _, availableHeight := calculateLayout(m.width, m.height, len(m.status))
 
 	if y < topHeight {
 		// Top row panels

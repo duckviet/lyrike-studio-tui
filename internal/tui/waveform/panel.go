@@ -7,6 +7,8 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
+
+	"github.com/duckviet/lyrike-studio-tui/internal/domain/lyrics"
 )
 
 type Panel struct {
@@ -25,10 +27,18 @@ type Panel struct {
 	width int
 
 	hoverCol int
+	lines    []lyrics.Line
 }
 
 var (
 	cursorStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("#FF3366"))
+	lyricActiveStyle = lipgloss.NewStyle().
+				Background(lipgloss.Color("#7D56F4")).
+				Foreground(lipgloss.Color("#FFFFFF")).
+				Bold(true)
+	lyricInactiveStyle = lipgloss.NewStyle().
+				Background(lipgloss.Color("#2C2C2C")).
+				Foreground(lipgloss.Color("#9E9E9E"))
 )
 
 func NewPanel() Panel {
@@ -72,6 +82,11 @@ func (p Panel) WithWidth(w int) Panel {
 
 func (p Panel) WithHover(col int) Panel {
 	p.hoverCol = col
+	return p
+}
+
+func (p Panel) WithLines(lines []lyrics.Line) Panel {
+	p.lines = lines
 	return p
 }
 
@@ -281,8 +296,15 @@ func (p Panel) View(width int, height int) string {
 		return p.viewSingleRow(width)
 	}
 
-	// We reserve 1 line for the timeline.
-	wfHeight := height - 1
+	// We reserve 1 line for the timeline and 1 line for the lyric track if showing.
+	showLyricTrack := height >= 4
+	var wfHeight int
+	if showLyricTrack {
+		wfHeight = height - 2
+	} else {
+		wfHeight = height - 1
+	}
+
 	var topPadding int
 	if wfHeight > 1 && wfHeight%2 == 0 {
 		wfHeight--
@@ -391,8 +413,14 @@ func (p Panel) View(width int, height int) string {
 		b.WriteString(strings.Join(grid[r], ""))
 		b.WriteByte('\n')
 	}
-	// Timeline at the very bottom
-	b.WriteString(p.timeline(width))
+	// Timeline and Lyric track
+	if showLyricTrack {
+		b.WriteString(p.timeline(width))
+		b.WriteByte('\n')
+		b.WriteString(p.renderLyricTrack(width))
+	} else {
+		b.WriteString(p.timeline(width))
+	}
 	return b.String()
 }
 
@@ -544,3 +572,125 @@ func clamp(value int64, minimum int64, maximum int64) int64 {
 	}
 	return value
 }
+
+func (p Panel) renderLyricTrack(width int) string {
+	if width <= 0 {
+		return ""
+	}
+
+	type lyricCell struct {
+		r        rune
+		active   bool
+		hasBlock bool
+	}
+
+	cells := make([]lyricCell, width)
+	for i := range cells {
+		cells[i] = lyricCell{r: ' ', active: false, hasBlock: false}
+	}
+
+	for _, line := range p.lines {
+		startMS := line.Start().Milliseconds()
+		endMS := line.End().Milliseconds()
+
+		if endMS <= startMS {
+			continue
+		}
+
+		startCol := p.columnFor(startMS, width)
+		endCol := p.columnFor(endMS, width)
+
+		if endCol < 0 || startCol >= width {
+			continue
+		}
+
+		visibleStart := startCol
+		if visibleStart < 0 {
+			visibleStart = 0
+		}
+		visibleEnd := endCol
+		if visibleEnd >= width {
+			visibleEnd = width - 1
+		}
+
+		if visibleStart > visibleEnd {
+			continue
+		}
+
+		isActive := p.positionMS >= startMS && p.positionMS <= endMS
+
+		hasLeftBoundary := startCol >= 0
+		hasRightBoundary := endCol < width
+
+		contentStart := visibleStart
+		if hasLeftBoundary {
+			contentStart = visibleStart + 1
+		}
+
+		contentEnd := visibleEnd
+		if hasRightBoundary {
+			contentEnd = visibleEnd - 1
+		}
+
+		for col := visibleStart; col <= visibleEnd; col++ {
+			cells[col].hasBlock = true
+			cells[col].active = isActive
+			cells[col].r = ' '
+		}
+
+		if hasLeftBoundary && visibleStart < width {
+			cells[visibleStart].r = '│'
+		}
+		if hasRightBoundary && visibleEnd >= 0 {
+			cells[visibleEnd].r = '│'
+		}
+
+		contentWidth := contentEnd - contentStart + 1
+		if contentWidth > 0 {
+			textRunes := []rune(line.Text().String())
+			var displayText []rune
+			if len(textRunes) > contentWidth {
+				if contentWidth > 3 {
+					displayText = append(textRunes[:contentWidth-2], '.', '.')
+				} else {
+					displayText = textRunes[:contentWidth]
+				}
+			} else {
+				padding := contentWidth - len(textRunes)
+				leftPad := padding / 2
+				rightPad := padding - leftPad
+				displayText = make([]rune, 0, contentWidth)
+				for i := 0; i < leftPad; i++ {
+					displayText = append(displayText, ' ')
+				}
+				displayText = append(displayText, textRunes...)
+				for i := 0; i < rightPad; i++ {
+					displayText = append(displayText, ' ')
+				}
+			}
+
+			for i, r := range displayText {
+				colIdx := contentStart + i
+				if colIdx >= 0 && colIdx < width {
+					cells[colIdx].r = r
+				}
+			}
+		}
+	}
+
+	var b strings.Builder
+	for _, c := range cells {
+		charStr := string(c.r)
+		if c.hasBlock {
+			if c.active {
+				b.WriteString(lyricActiveStyle.Render(charStr))
+			} else {
+				b.WriteString(lyricInactiveStyle.Render(charStr))
+			}
+		} else {
+			b.WriteString(charStr)
+		}
+	}
+	return b.String()
+}
+
