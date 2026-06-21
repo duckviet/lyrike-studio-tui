@@ -10,6 +10,7 @@ import (
 	"github.com/duckviet/lyrike-studio-tui/internal/domain/history"
 	"github.com/duckviet/lyrike-studio-tui/internal/domain/lyrics"
 	"github.com/duckviet/lyrike-studio-tui/internal/playback"
+	"github.com/duckviet/lyrike-studio-tui/internal/tui/viewport"
 )
 
 type Panel struct {
@@ -26,6 +27,7 @@ type Panel struct {
 	cursorPos          int
 	ShowHelp           bool
 	helpScroll         int
+	viewport           viewport.Model
 }
 
 var (
@@ -75,6 +77,7 @@ func NewPanel(doc lyrics.Document) Panel {
 		Title:    "Lyrics",
 		Document: doc,
 		manager:  history.NewManager(),
+		viewport: viewport.New(0, 10).WithTotalLines(len(doc.Lines())),
 	}
 }
 
@@ -122,6 +125,22 @@ type StartPublishMsg struct {
 func (p Panel) WithSelected(index int) Panel {
 	if index >= 0 && index < len(p.Document.Lines()) {
 		p.selected = index
+		p.viewport = p.viewport.WithTotalLines(len(p.Document.Lines())).EnsureVisible(index)
+	}
+	return p
+}
+
+func (p Panel) WithHeight(h int) Panel {
+	p.viewport = p.viewport.WithHeight(h).EnsureVisible(p.selected)
+	return p
+}
+
+func (p Panel) HandleMouseScroll(button tea.MouseButton) Panel {
+	p.viewport = p.viewport.WithTotalLines(len(p.Document.Lines())).WithHeight(p.viewport.Height)
+	if button == tea.MouseWheelUp {
+		p.viewport = p.viewport.ScrollUp()
+	} else if button == tea.MouseWheelDown {
+		p.viewport = p.viewport.ScrollDown()
 	}
 	return p
 }
@@ -164,23 +183,12 @@ func (p Panel) View(_ int, height int) string {
 	}
 
 	lines := p.Document.Lines()
-	startIdx := 0
-	endIdx := len(lines)
+	p.viewport = p.viewport.WithHeight(height).WithTotalLines(len(lines)).EnsureVisible(p.selected)
 
-	if len(lines) > height {
-		half := height / 2
-		startIdx = p.selected - half
-		if startIdx < 0 {
-			startIdx = 0
-		}
-		endIdx = startIdx + height
-		if endIdx > len(lines) {
-			endIdx = len(lines)
-			startIdx = endIdx - height
-			if startIdx < 0 {
-				startIdx = 0
-			}
-		}
+	startIdx := p.viewport.YOffset
+	endIdx := startIdx + height
+	if endIdx > len(lines) {
+		endIdx = len(lines)
 	}
 
 	activeIdx := p.activeLineIndex()

@@ -44,7 +44,7 @@ func (p Panel) handleKey(key tea.KeyPressMsg) (Panel, tea.Cmd) {
 					p.lastErr = fmt.Errorf("parse failed: %w", err)
 				} else {
 					p.Document = doc
-					p.selected = 0
+					p = p.WithSelected(0)
 					p.lastErr = nil
 					p.Importing = false
 					p.InputText = ""
@@ -160,12 +160,12 @@ func (p Panel) handleKey(key tea.KeyPressMsg) (Panel, tea.Cmd) {
 	switch {
 	case key.Code == tea.KeyDown || key.Code == 'j':
 		if len(p.Document.Lines()) > 0 {
-			p.selected = min(p.selected+1, len(p.Document.Lines())-1)
+			p = p.WithSelected(min(p.selected+1, len(p.Document.Lines())-1))
 			return p, nil
 		}
 	case key.Code == tea.KeyUp || key.Code == 'k':
 		if len(p.Document.Lines()) > 0 {
-			p.selected = max(p.selected-1, 0)
+			p = p.WithSelected(max(p.selected-1, 0))
 			return p, nil
 		}
 	case key.Code == 'g':
@@ -175,18 +175,18 @@ func (p Panel) handleKey(key tea.KeyPressMsg) (Panel, tea.Cmd) {
 	case key.Code == 'f' || (key.Code == 'f' && key.Mod == tea.ModCtrl):
 		activeIdx := p.activeLineIndex()
 		if activeIdx != -1 {
-			p.selected = activeIdx
+			p = p.WithSelected(activeIdx)
 		}
 		return p, nil
 	case key.Code == 'J' && key.Mod == tea.ModShift: // Swap text down
 		if p.selected+1 < len(p.Document.Lines()) {
 			p = p.apply(history.SwapText{Index: p.selected})
-			p.selected++
+			p = p.WithSelected(p.selected + 1)
 		}
 	case key.Code == 'K' && key.Mod == tea.ModShift: // Swap text up
 		if p.selected > 0 {
 			p = p.apply(history.SwapText{Index: p.selected - 1})
-			p.selected--
+			p = p.WithSelected(p.selected - 1)
 		}
 	case key.Code == 'e':
 		if len(p.Document.Lines()) > 0 {
@@ -209,7 +209,7 @@ func (p Panel) handleKey(key tea.KeyPressMsg) (Panel, tea.Cmd) {
 		txt, _ := lyrics.NewText("")
 		line, _ := lyrics.NewLine(ts, te, txt)
 		p = p.apply(history.InsertLine{Index: idx, Line: line})
-		p.selected = idx
+		p = p.WithSelected(idx)
 		p.Editing = true
 		p.InputText = ""
 		p.cursorPos = 0
@@ -226,7 +226,7 @@ func (p Panel) handleKey(key tea.KeyPressMsg) (Panel, tea.Cmd) {
 		txt, _ := lyrics.NewText("")
 		line, _ := lyrics.NewLine(ts, te, txt)
 		p = p.apply(history.InsertLine{Index: idx, Line: line})
-		p.selected = idx
+		p = p.WithSelected(idx)
 		p.Editing = true
 		p.InputText = ""
 		p.cursorPos = 0
@@ -234,7 +234,7 @@ func (p Panel) handleKey(key tea.KeyPressMsg) (Panel, tea.Cmd) {
 	case key.Code == 'd':
 		if len(p.Document.Lines()) > 0 {
 			p = p.apply(history.DeleteLine{Index: p.selected})
-			p.selected = max(0, min(p.selected, len(p.Document.Lines())-1))
+			p = p.WithSelected(max(0, min(p.selected, len(p.Document.Lines())-1)))
 		}
 		return p, nil
 	case key.Code == 's': // Split line at playhead

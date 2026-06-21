@@ -23,6 +23,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.width = msg.Width
 		m.height = msg.Height
 		m.waveform = m.waveform.WithWidth(m.width - 2)
+		topHeight, _, _, _, _ := calculateLayout(m.width, m.height, len(m.status))
+		m.editor = m.editor.WithHeight(topHeight - 3)
 		return m, nil
 
 	case tea.KeyPressMsg:
@@ -194,6 +196,9 @@ func (m Model) handleMouse(msg tea.MouseMsg) Model {
 		} else {
 			if m.focus != focusPublish {
 				m.focus = focusEditor
+			}
+			if mouse.Button == tea.MouseWheelUp || mouse.Button == tea.MouseWheelDown {
+				m.editor = m.editor.HandleMouseScroll(mouse.Button)
 			}
 		}
 		m.waveform = m.waveform.WithHover(-1)

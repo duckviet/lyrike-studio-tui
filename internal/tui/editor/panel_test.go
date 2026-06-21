@@ -245,5 +245,32 @@ func TestLyricsKeyboardSnapToActive(t *testing.T) {
 	}
 }
 
+func TestLyricsScrolling(t *testing.T) {
+	t.Parallel()
+
+	panel := NewPanel(testDocument(t))
+	panel = panel.WithHeight(1)
+
+	if panel.viewport.YOffset != 0 {
+		t.Fatalf("expected initial scrollOffset to be 0, got %d", panel.viewport.YOffset)
+	}
+
+	panel = panel.WithSelected(1)
+	if panel.viewport.YOffset != 1 {
+		t.Fatalf("expected scrollOffset to follow selection to 1, got %d", panel.viewport.YOffset)
+	}
+
+	panel = panel.HandleMouseScroll(tea.MouseWheelUp)
+	if panel.viewport.YOffset != 0 {
+		t.Fatalf("expected scrollOffset to be 0 after mouse scroll up, got %d", panel.viewport.YOffset)
+	}
+
+	panel = panel.HandleMouseScroll(tea.MouseWheelDown)
+	if panel.viewport.YOffset != 1 {
+		t.Fatalf("expected scrollOffset to be 1 after mouse scroll down, got %d", panel.viewport.YOffset)
+	}
+}
+
+
 
 
