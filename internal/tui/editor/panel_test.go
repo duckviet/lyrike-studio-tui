@@ -16,17 +16,17 @@ func TestLyricsKeyboardEditUpdatesDocumentState(t *testing.T) {
 
 	// Enter editing mode
 	panel, _ = panel.Update(tea.KeyPressMsg{Code: 'e'})
-	
+
 	// Send Backspace 10 times to clear "First line"
 	for i := 0; i < 10; i++ {
 		panel, _ = panel.Update(tea.KeyPressMsg{Code: tea.KeyBackspace})
 	}
-	
+
 	// Type "Edited line"
 	for _, char := range "Edited line" {
 		panel, _ = panel.Update(tea.KeyPressMsg{Text: string(char)})
 	}
-	
+
 	// Press Enter to submit
 	updated, _ := panel.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
 
@@ -270,7 +270,3 @@ func TestLyricsScrolling(t *testing.T) {
 		t.Fatalf("expected scrollOffset to be 1 after mouse scroll down, got %d", panel.viewport.YOffset)
 	}
 }
-
-
-
-

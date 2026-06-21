@@ -112,5 +112,3 @@ func TestWaveformFollowMode(t *testing.T) {
 		t.Fatal("expected follow to be disabled after panning")
 	}
 }
-
-
