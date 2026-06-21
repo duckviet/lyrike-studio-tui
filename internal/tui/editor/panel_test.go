@@ -1,0 +1,170 @@
+package editor
+
+import (
+	"testing"
+
+	tea "charm.land/bubbletea/v2"
+
+	"github.com/duckviet/lyrike-studio-tui/internal/domain/lyrics"
+	"github.com/duckviet/lyrike-studio-tui/internal/playback"
+)
+
+func TestLyricsKeyboardEditUpdatesDocumentState(t *testing.T) {
+	t.Parallel()
+
+	panel := NewPanel(testDocument(t))
+
+	// Enter editing mode
+	panel, _ = panel.Update(tea.KeyPressMsg{Code: 'e'})
+	
+	// Send Backspace 10 times to clear "First line"
+	for i := 0; i < 10; i++ {
+		panel, _ = panel.Update(tea.KeyPressMsg{Code: tea.KeyBackspace})
+	}
+	
+	// Type "Edited line"
+	for _, char := range "Edited line" {
+		panel, _ = panel.Update(tea.KeyPressMsg{Text: string(char)})
+	}
+	
+	// Press Enter to submit
+	updated, _ := panel.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
+
+	if got := updated.Document.Lines()[0].Text().String(); got != "Edited line" {
+		t.Fatalf("edited line text = %q, want Edited line", got)
+	}
+}
+
+func TestLyricsCursorBasedEditing(t *testing.T) {
+	t.Parallel()
+
+	panel := NewPanel(testDocument(t))
+
+	// Enter editing mode (cursor starts at end: index 10)
+	panel, _ = panel.Update(tea.KeyPressMsg{Code: 'e'})
+
+	// Move cursor left 4 times (to index 6, after "First ")
+	for i := 0; i < 4; i++ {
+		panel, _ = panel.Update(tea.KeyPressMsg{Code: tea.KeyLeft})
+	}
+
+	// Insert "New " at cursor
+	for _, char := range "New " {
+		panel, _ = panel.Update(tea.KeyPressMsg{Text: string(char)})
+	}
+
+	// Press Enter to submit
+	updated, _ := panel.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
+
+	if got := updated.Document.Lines()[0].Text().String(); got != "First New line" {
+		t.Fatalf("edited text = %q, want 'First New line'", got)
+	}
+}
+
+func TestUndoRedoKeyboardRestoresDocumentState(t *testing.T) {
+	t.Parallel()
+
+	panel := NewPanel(testDocument(t))
+	// Enter editing mode
+	edited, _ := panel.Update(tea.KeyPressMsg{Code: 'e'})
+	// Send Backspace 10 times to clear "First line"
+	for i := 0; i < 10; i++ {
+		edited, _ = edited.Update(tea.KeyPressMsg{Code: tea.KeyBackspace})
+	}
+	// Type "Edited line"
+	for _, char := range "Edited line" {
+		edited, _ = edited.Update(tea.KeyPressMsg{Text: string(char)})
+	}
+	// Press Enter to submit
+	edited, _ = edited.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
+
+	undone, _ := edited.Update(tea.KeyPressMsg{Code: 'z', Mod: tea.ModCtrl})
+	redone, _ := undone.Update(tea.KeyPressMsg{Code: 'y', Mod: tea.ModCtrl})
+
+	if got := undone.Document.Lines()[0].Text().String(); got != "First line" {
+		t.Fatalf("undo line text = %q, want First line", got)
+	}
+	if got := redone.Document.Lines()[0].Text().String(); got != "Edited line" {
+		t.Fatalf("redo line text = %q, want Edited line", got)
+	}
+}
+
+func TestTapKeyboardUsesPlaybackPosition(t *testing.T) {
+	t.Parallel()
+
+	position, err := playback.NewPosition(3_500)
+	if err != nil {
+		t.Fatalf("NewPosition() error = %v", err)
+	}
+	panel := NewPanel(testDocument(t)).WithTapPosition(position)
+	panel, _ = panel.Update(tea.KeyPressMsg{Code: tea.KeyDown})
+
+	updated, _ := panel.Update(tea.KeyPressMsg{Code: 't'})
+
+	if got := updated.Document.Lines()[1].Start().Milliseconds(); got != 3_500 {
+		t.Fatalf("tap start timestamp = %d, want 3500", got)
+	}
+}
+
+func TestSplitAndMergeKeyboard(t *testing.T) {
+	t.Parallel()
+
+	position, _ := playback.NewPosition(1_500)
+	panel := NewPanel(testDocument(t)).WithTapPosition(position)
+
+	// Split first line at 1500ms
+	panel, _ = panel.Update(tea.KeyPressMsg{Code: 's'})
+
+	if len(panel.Document.Lines()) != 3 {
+		t.Fatalf("lines count after split = %d, want 3", len(panel.Document.Lines()))
+	}
+
+	// Merge back
+	panel, _ = panel.Update(tea.KeyPressMsg{Code: 'm'})
+
+	if len(panel.Document.Lines()) != 2 {
+		t.Fatalf("lines count after merge = %d, want 2", len(panel.Document.Lines()))
+	}
+}
+
+func testDocument(t *testing.T) lyrics.Document {
+	t.Helper()
+
+	firstStart, err := lyrics.ParseTimestamp("00:01.00")
+	if err != nil {
+		t.Fatalf("ParseTimestamp(firstStart) error = %v", err)
+	}
+	firstEnd, err := lyrics.ParseTimestamp("00:02.00")
+	if err != nil {
+		t.Fatalf("ParseTimestamp(firstEnd) error = %v", err)
+	}
+	secondStart, err := lyrics.ParseTimestamp("00:04.00")
+	if err != nil {
+		t.Fatalf("ParseTimestamp(secondStart) error = %v", err)
+	}
+	secondEnd, err := lyrics.ParseTimestamp("00:06.00")
+	if err != nil {
+		t.Fatalf("ParseTimestamp(secondEnd) error = %v", err)
+	}
+	firstText, err := lyrics.NewText("First line")
+	if err != nil {
+		t.Fatalf("NewText(first) error = %v", err)
+	}
+	secondText, err := lyrics.NewText("Second line")
+	if err != nil {
+		t.Fatalf("NewText(second) error = %v", err)
+	}
+	firstLine, err := lyrics.NewLine(firstStart, firstEnd, firstText)
+	if err != nil {
+		t.Fatalf("NewLine(first) error = %v", err)
+	}
+	secondLine, err := lyrics.NewLine(secondStart, secondEnd, secondText)
+	if err != nil {
+		t.Fatalf("NewLine(second) error = %v", err)
+	}
+	doc, err := lyrics.NewDocument([]lyrics.Line{firstLine, secondLine})
+	if err != nil {
+		t.Fatalf("NewDocument() error = %v", err)
+	}
+	return doc
+}

@@ -4,23 +4,36 @@ import (
 	"strings"
 )
 
+const defaultLastLineDurationMS = 10_000
+
 func ParseLRC(input string) (Document, error) {
 	normalized := strings.ReplaceAll(input, "\r\n", "\n")
-	var lines []Line
+	var rawLines []rawParsedLine
+	var metadata []Metadata
 	for index, raw := range strings.Split(normalized, "\n") {
 		lineNumber := index + 1
 		row := strings.TrimSpace(raw)
 		if row == "" {
 			continue
 		}
-		line, err := parseLRCLine(row, lineNumber)
+		if isMetadataLine(row) {
+			item, err := parseMetadataLine(row, lineNumber)
+			if err != nil {
+				return Document{}, err
+			}
+			metadata = append(metadata, item)
+			continue
+		}
+		parsed, err := parseLRCLine(row, lineNumber)
 		if err != nil {
 			return Document{}, err
 		}
-		if err := validateLineOrder(lines, line, lineNumber); err != nil {
-			return Document{}, err
-		}
-		lines = append(lines, line)
+		rawLines = append(rawLines, parsed)
+	}
+
+	lines, err := buildLinesWithEnd(rawLines)
+	if err != nil {
+		return Document{}, err
 	}
 	doc, err := NewDocument(lines)
 	if err != nil {
@@ -29,32 +42,116 @@ func ParseLRC(input string) (Document, error) {
 		}
 		return Document{}, err
 	}
-	return doc, nil
+	return doc.WithMetadata(metadata), nil
 }
 
-func parseLRCLine(row string, lineNumber int) (Line, error) {
+type rawParsedLine struct {
+	start Timestamp
+	end   *Timestamp
+	text  Text
+	words []WordTiming
+}
+
+func buildLinesWithEnd(rawLines []rawParsedLine) ([]Line, error) {
+	lines := make([]Line, 0, len(rawLines))
+	for i, raw := range rawLines {
+		var end Timestamp
+		var err error
+		if raw.end != nil {
+			end = *raw.end
+		} else {
+			var endMS int64
+			if i+1 < len(rawLines) {
+				endMS = rawLines[i+1].start.Milliseconds()
+			} else {
+				endMS = raw.start.Milliseconds() + defaultLastLineDurationMS
+			}
+			end, err = NewTimestamp(endMS)
+			if err != nil {
+				return nil, err
+			}
+		}
+		var line Line
+		if len(raw.words) > 0 {
+			line, err = NewEnhancedLine(raw.start, end, raw.text, raw.words)
+		} else {
+			line, err = NewLine(raw.start, end, raw.text)
+		}
+		if err != nil {
+			return nil, err
+		}
+		lines = append(lines, line)
+	}
+	return lines, nil
+}
+
+func isMetadataLine(row string) bool {
+	if !strings.HasPrefix(row, "[") || !strings.HasSuffix(row, "]") {
+		return false
+	}
+	content := strings.TrimSuffix(strings.TrimPrefix(row, "["), "]")
+	key, _, ok := strings.Cut(content, ":")
+	if !ok {
+		return false
+	}
+	if _, err := ParseTimestamp(content); err == nil {
+		return false
+	}
+	return strings.TrimSpace(key) != ""
+}
+
+func parseMetadataLine(row string, lineNumber int) (Metadata, error) {
+	content := strings.TrimSuffix(strings.TrimPrefix(row, "["), "]")
+	key, value, ok := strings.Cut(content, ":")
+	if !ok {
+		return Metadata{}, newValidationError(CodeMalformedLine, lineNumber, "metadata", row, "metadata must use [key:value]")
+	}
+	metadata, err := NewMetadata(key, value)
+	return metadata, withLine(err, lineNumber)
+}
+
+func parseLRCLine(row string, lineNumber int) (rawParsedLine, error) {
 	if !strings.HasPrefix(row, "[") {
-		return Line{}, newValidationError(CodeMalformedLine, lineNumber, "line", row, "lyric line must start with [mm:ss.xx]")
+		return rawParsedLine{}, newValidationError(CodeMalformedLine, lineNumber, "line", row, "lyric line must start with [mm:ss.xx]")
 	}
 	closing := strings.Index(row, "]")
 	if closing <= 1 {
-		return Line{}, newValidationError(CodeMalformedLine, lineNumber, "line", row, "lyric line must include a closing timestamp bracket")
+		return rawParsedLine{}, newValidationError(CodeMalformedLine, lineNumber, "line", row, "lyric line must include a closing timestamp bracket")
 	}
-	timestamp, err := parseTimestamp(row[1:closing], lineNumber, "timestamp")
-	if err != nil {
-		return Line{}, err
+	timePart := row[1:closing]
+	var startTS, endTS Timestamp
+	var err error
+	var hasEnd bool
+	if strings.Contains(timePart, "-") {
+		parts := strings.Split(timePart, "-")
+		if len(parts) != 2 {
+			return rawParsedLine{}, newValidationError(CodeMalformedLine, lineNumber, "timestamp", row, "invalid start-end range")
+		}
+		startTS, err = parseTimestamp(parts[0], lineNumber, "timestamp")
+		if err != nil {
+			return rawParsedLine{}, err
+		}
+		endTS, err = parseTimestamp(parts[1], lineNumber, "timestamp")
+		if err != nil {
+			return rawParsedLine{}, err
+		}
+		hasEnd = true
+	} else {
+		startTS, err = parseTimestamp(timePart, lineNumber, "timestamp")
+		if err != nil {
+			return rawParsedLine{}, err
+		}
 	}
 
 	text, words, err := parseEnhancedText(row[closing+1:], lineNumber)
 	if err != nil {
-		return Line{}, err
+		return rawParsedLine{}, err
 	}
-	if len(words) > 0 {
-		line, err := NewEnhancedLine(timestamp, text, words)
-		return line, withLine(err, lineNumber)
+	var endPtr *Timestamp
+	if hasEnd {
+		endPtr = &endTS
 	}
-	line, err := NewLine(timestamp, text)
-	return line, withLine(err, lineNumber)
+	return rawParsedLine{start: startTS, end: endPtr, text: text, words: words}, nil
 }
 
 func parseEnhancedText(input string, lineNumber int) (Text, []WordTiming, error) {
@@ -124,19 +221,4 @@ func withLine(err error, lineNumber int) error {
 		return validationErr
 	}
 	return err
-}
-
-func validateLineOrder(lines []Line, next Line, lineNumber int) error {
-	if len(lines) == 0 {
-		return nil
-	}
-	previous := lines[len(lines)-1].Timestamp().Milliseconds()
-	current := next.Timestamp().Milliseconds()
-	if current == previous {
-		return newValidationError(CodeDuplicateTimestamp, lineNumber, "timestamp", next.Timestamp().String(), "lyric timestamps must be unique")
-	}
-	if current < previous {
-		return newValidationError(CodeUnsortedTimestamp, lineNumber, "timestamp", next.Timestamp().String(), "lyric timestamps must be strictly increasing")
-	}
-	return nil
 }

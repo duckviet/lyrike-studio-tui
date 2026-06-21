@@ -17,6 +17,10 @@ func NewFakePlayer(duration Duration) (*FakePlayer, error) {
 	}, nil
 }
 
+func (p *FakePlayer) SetDuration(duration Duration) {
+	p.duration = duration
+}
+
 func (p *FakePlayer) Snapshot() Snapshot {
 	return Snapshot{
 		Position: p.position,

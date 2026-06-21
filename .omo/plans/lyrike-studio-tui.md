@@ -96,7 +96,7 @@ Critical path: Task 1 -> Task 2 -> Task 6 -> Task 11 -> Task 13 -> Task 15 -> Ta
 ## Todos
 > Implementation + Test = one task. Every task must capture RED, GREEN, and surface evidence before completion.
 
-- [ ] 1. Initialize workspace, module, repo hygiene, and local rules
+- [x] 1. Initialize workspace, module, repo hygiene, and local rules
 
   What to do: Create `go.mod`, `cmd/lyrike-studio-tui/main.go`, top-level `README.md`, `.gitignore`, `docs/`, and scoped `AGENTS.md` files. Use module path `github.com/duckviet/lyrike-studio-tui`. Add a minimal CLI that starts the TUI and supports `--version`.
   Must NOT do: Do not import TUI packages before the module and rules are in place. Do not commit caches or generated local state.
@@ -111,9 +111,9 @@ Critical path: Task 1 -> Task 2 -> Task 6 -> Task 11 -> Task 13 -> Task 15 -> Ta
   - External: `https://pkg.go.dev/github.com/charmbracelet/bubbletea/v2` - Bubble Tea v2 API.
 
   Acceptance criteria:
-  - [ ] `go test ./...` exits 0.
-  - [ ] `go run ./cmd/lyrike-studio-tui --version` prints a non-empty version string and exits 0.
-  - [ ] `find . -name AGENTS.md -print` lists root plus scoped instruction files.
+  - [x] `go test ./...` exits 0.
+  - [x] `go run ./cmd/lyrike-studio-tui --version` prints a non-empty version string and exits 0.
+  - [x] `find . -name AGENTS.md -print` lists root plus scoped instruction files.
 
   QA scenarios:
   ```
@@ -132,7 +132,7 @@ Critical path: Task 1 -> Task 2 -> Task 6 -> Task 11 -> Task 13 -> Task 15 -> Ta
 
   Commit: YES | Message: `chore(workspace): initialize tui module` | Files: [`go.mod`, `cmd/`, `docs/`, `README.md`, `.gitignore`, `AGENTS.md`]
 
-- [ ] 2. Implement LRC domain parser and renderer
+- [x] 2. Implement LRC domain parser and renderer
 
   What to do: Add `internal/domain/lyrics` types for metadata, timed lines, enhanced inline timestamps, parse errors, and render options. Support standard LRC and preserve enhanced LRC data without implementing word tap-sync.
   Must NOT do: Do not pass raw maps or untyped JSON through domain APIs. Do not discard unknown metadata.
@@ -146,8 +146,8 @@ Critical path: Task 1 -> Task 2 -> Task 6 -> Task 11 -> Task 13 -> Task 15 -> Ta
   - External: `https://en.wikipedia.org/wiki/LRC_(file_format)` - baseline LRC format.
 
   Acceptance criteria:
-  - [ ] RED test first for parse/render round-trip, invalid timestamp, duplicate/out-of-order timestamp handling.
-  - [ ] `go test ./internal/domain/lyrics -run Test` exits 0.
+  - [x] RED test first for parse/render round-trip, invalid timestamp, duplicate/out-of-order timestamp handling.
+  - [x] `go test ./internal/domain/lyrics -run Test` exits 0.
 
   QA scenarios:
   ```
@@ -166,7 +166,7 @@ Critical path: Task 1 -> Task 2 -> Task 6 -> Task 11 -> Task 13 -> Task 15 -> Ta
 
   Commit: YES | Message: `feat(lyrics): add lrc parser and renderer` | Files: [`internal/domain/lyrics/`]
 
-- [ ] 3. Define playback contracts and deterministic fake player
+- [x] 3. Define playback contracts and deterministic fake player
 
   What to do: Add `internal/playback` interfaces for player commands, observed time, pause/play state, errors, and event subscription. Add a fake player for tests and TUI smoke scenarios.
   Must NOT do: Do not connect to mpv in this task. Do not use wall-clock sleeps in tests.
@@ -179,8 +179,8 @@ Critical path: Task 1 -> Task 2 -> Task 6 -> Task 11 -> Task 13 -> Task 15 -> Ta
   - mpv property: `https://mpv.io/manual/stable/#command-interface-time-pos` - `time-pos` clock source.
 
   Acceptance criteria:
-  - [ ] RED test first for seek/play/pause event flow.
-  - [ ] `go test ./internal/playback -run TestFakePlayer -v` exits 0.
+  - [x] RED test first for seek/play/pause event flow.
+  - [x] `go test ./internal/playback -run TestFakePlayer -v` exits 0.
 
   QA scenarios:
   ```
@@ -193,7 +193,7 @@ Critical path: Task 1 -> Task 2 -> Task 6 -> Task 11 -> Task 13 -> Task 15 -> Ta
 
   Commit: YES | Message: `feat(playback): define player clock contracts` | Files: [`internal/playback/`]
 
-- [ ] 4. Define backend client contracts and fixtures
+- [x] 4. Define backend client contracts and fixtures
 
   What to do: Add typed contracts under `internal/integrations/backend` for fetch, audio URL/range expectations, peaks, transcription SSE, challenge, and publish. Add fixtures matching `/local-api` responses from the existing FastAPI app.
   Must NOT do: Do not perform live network calls in unit tests. Do not encode browser-only assumptions.
@@ -207,8 +207,8 @@ Critical path: Task 1 -> Task 2 -> Task 6 -> Task 11 -> Task 13 -> Task 15 -> Ta
   - Spec: `/home/duckviet/lrclib-upload/docs/specs/005-publish-migration.md` - publish flow.
 
   Acceptance criteria:
-  - [ ] RED test first for JSON decoding and error handling.
-  - [ ] `go test ./internal/integrations/backend -run TestDecode -v` exits 0.
+  - [x] RED test first for JSON decoding and error handling.
+  - [x] `go test ./internal/integrations/backend -run TestDecode -v` exits 0.
 
   QA scenarios:
   ```
@@ -221,7 +221,7 @@ Critical path: Task 1 -> Task 2 -> Task 6 -> Task 11 -> Task 13 -> Task 15 -> Ta
 
   Commit: YES | Message: `feat(backend): define local api contracts` | Files: [`internal/integrations/backend/`]
 
-- [ ] 5. Define atomic draft persistence contracts
+- [x] 5. Define atomic draft persistence contracts
 
   What to do: Add `internal/domain/draft` and `internal/storage` contracts for draft IDs, video IDs, metadata, lyrics doc snapshot, and atomic write/read/delete using XDG paths.
   Must NOT do: Do not write to the user home directory in tests; use `t.TempDir()` and injected paths.
@@ -234,8 +234,8 @@ Critical path: Task 1 -> Task 2 -> Task 6 -> Task 11 -> Task 13 -> Task 15 -> Ta
   - External: `https://specifications.freedesktop.org/basedir-spec/latest/` - XDG Base Directory spec.
 
   Acceptance criteria:
-  - [ ] RED test first for atomic write and recovery after partial temp file.
-  - [ ] `go test ./internal/storage -run TestDraft -v` exits 0.
+  - [x] RED test first for atomic write and recovery after partial temp file.
+  - [x] `go test ./internal/storage -run TestDraft -v` exits 0.
 
   QA scenarios:
   ```
@@ -248,7 +248,7 @@ Critical path: Task 1 -> Task 2 -> Task 6 -> Task 11 -> Task 13 -> Task 15 -> Ta
 
   Commit: YES | Message: `feat(storage): add atomic draft contracts` | Files: [`internal/domain/draft/`, `internal/storage/`]
 
-- [ ] 6. Add lyric edit actions, undo/redo history, and tap-sync
+- [x] 6. Add lyric edit actions, undo/redo history, and tap-sync
 
   What to do: Implement typed commands for set timestamp, edit text, insert line, delete line, reorder line, undo, redo, and tap-sync against the authoritative playback clock.
   Must NOT do: Do not implement word-level tap-sync. Do not mutate command input parameters.
@@ -261,8 +261,8 @@ Critical path: Task 1 -> Task 2 -> Task 6 -> Task 11 -> Task 13 -> Task 15 -> Ta
   - Playback contract from Task 3: `internal/playback`.
 
   Acceptance criteria:
-  - [ ] RED tests first for each command and undo/redo edge.
-  - [ ] `go test ./internal/domain/... -run 'Test.*History|Test.*TapSync' -v` exits 0.
+  - [x] RED tests first for each command and undo/redo edge.
+  - [x] `go test ./internal/domain/... -run 'Test.*History|Test.*TapSync' -v` exits 0.
 
   QA scenarios:
   ```
@@ -275,7 +275,7 @@ Critical path: Task 1 -> Task 2 -> Task 6 -> Task 11 -> Task 13 -> Task 15 -> Ta
 
   Commit: YES | Message: `feat(lyrics): add edit history and tap sync` | Files: [`internal/domain/lyrics/`, `internal/domain/history/`]
 
-- [ ] 7. Implement mpv Unix IPC playback adapter
+- [x] 7. Implement mpv Unix IPC playback adapter
 
   What to do: Add Unix socket JSON IPC client for mpv, observe `time-pos`, send play/pause/seek commands, handle socket disconnects, and expose actionable missing-mpv guidance.
   Must NOT do: Do not add Windows named-pipe support. Do not treat the TUI timer as authoritative clock.
@@ -289,8 +289,8 @@ Critical path: Task 1 -> Task 2 -> Task 6 -> Task 11 -> Task 13 -> Task 15 -> Ta
   - Contract from Task 3: `internal/playback`.
 
   Acceptance criteria:
-  - [ ] RED integration test first using a local Unix socket fake mpv server.
-  - [ ] `go test ./internal/playback/mpv -run Test -v` exits 0.
+  - [x] RED integration test first using a local Unix socket fake mpv server.
+  - [x] `go test ./internal/playback/mpv -run Test -v` exits 0.
 
   QA scenarios:
   ```
@@ -309,7 +309,7 @@ Critical path: Task 1 -> Task 2 -> Task 6 -> Task 11 -> Task 13 -> Task 15 -> Ta
 
   Commit: YES | Message: `feat(playback): add mpv ipc adapter` | Files: [`internal/playback/mpv/`]
 
-- [ ] 8. Implement backend HTTP client
+- [x] 8. Implement backend HTTP client
 
   What to do: Implement typed HTTP client for fetch, audio/peaks URLs or payloads, transcription SSE, publish challenge, PoW token submission, and structured errors.
   Must NOT do: Do not solve PoW in the backend client. Do not use bare default `http.Client` without timeout.
@@ -323,8 +323,8 @@ Critical path: Task 1 -> Task 2 -> Task 6 -> Task 11 -> Task 13 -> Task 15 -> Ta
   - Publish flow: `/home/duckviet/lrclib-upload/lyrike-studio/features/publish/model/publishFlow.ts`.
 
   Acceptance criteria:
-  - [ ] RED tests first using `httptest.Server` for success, HTTP error, invalid JSON, and SSE status stream.
-  - [ ] `go test ./internal/integrations/backend -run TestClient -v` exits 0.
+  - [x] RED tests first using `httptest.Server` for success, HTTP error, invalid JSON, and SSE status stream.
+  - [x] `go test ./internal/integrations/backend -run TestClient -v` exits 0.
 
   QA scenarios:
   ```
@@ -343,7 +343,7 @@ Critical path: Task 1 -> Task 2 -> Task 6 -> Task 11 -> Task 13 -> Task 15 -> Ta
 
   Commit: YES | Message: `feat(backend): add local api client` | Files: [`internal/integrations/backend/`]
 
-- [ ] 9. Implement XDG atomic draft storage
+- [x] 9. Implement XDG atomic draft storage
 
   What to do: Implement draft storage with temp-file write, fsync where available, atomic rename, read/list/delete, and corrupt-file error reporting.
   Must NOT do: Do not immediately re-read after write as redundant verification in production code; tests own verification.
@@ -355,8 +355,8 @@ Critical path: Task 1 -> Task 2 -> Task 6 -> Task 11 -> Task 13 -> Task 15 -> Ta
   - XDG spec: `https://specifications.freedesktop.org/basedir-spec/latest/`.
 
   Acceptance criteria:
-  - [ ] RED tests first for round-trip, corrupt JSON, and interrupted temp file.
-  - [ ] `go test ./internal/storage -run TestDraftStore -v` exits 0.
+  - [x] RED tests first for round-trip, corrupt JSON, and interrupted temp file.
+  - [x] `go test ./internal/storage -run TestDraftStore -v` exits 0.
 
   QA scenarios:
   ```
@@ -369,7 +369,7 @@ Critical path: Task 1 -> Task 2 -> Task 6 -> Task 11 -> Task 13 -> Task 15 -> Ta
 
   Commit: YES | Message: `feat(storage): persist drafts atomically` | Files: [`internal/storage/`]
 
-- [ ] 10. Fix existing backend peaks-cache bug
+- [x] 10. Fix existing backend peaks-cache bug
 
   What to do: In `/home/duckviet/lrclib-upload/backend/routes/local_api.py`, fix only the peaks-cache behavior discovered during planning. Add or update one regression test under `/home/duckviet/lrclib-upload/backend/tests`.
   Must NOT do: Do not refactor unrelated backend routes. Do not alter frontend behavior.
@@ -383,9 +383,9 @@ Critical path: Task 1 -> Task 2 -> Task 6 -> Task 11 -> Task 13 -> Task 15 -> Ta
   - Backend tests: `/home/duckviet/lrclib-upload/backend/tests`.
 
   Acceptance criteria:
-  - [ ] RED pytest first that fails on the current peaks-cache bug for the right reason.
-  - [ ] Targeted pytest for the new regression exits 0.
-  - [ ] Existing related backend tests still exit 0.
+  - [x] RED pytest first that fails on the current peaks-cache bug for the right reason.
+  - [x] Targeted pytest for the new regression exits 0.
+  - [x] Existing related backend tests still exit 0.
 
   QA scenarios:
   ```
@@ -404,7 +404,7 @@ Critical path: Task 1 -> Task 2 -> Task 6 -> Task 11 -> Task 13 -> Task 15 -> Ta
 
   Commit: YES | Message: `fix(backend): correct peaks cache lookup` | Files: [`/home/duckviet/lrclib-upload/backend/routes/local_api.py`, `/home/duckviet/lrclib-upload/backend/tests/`]
 
-- [ ] 11. Build three-panel TUI model and layout
+- [x] 11. Build three-panel TUI model and layout
 
   What to do: Add `internal/tui` app model with media/fetch panel, waveform/playback panel, and lyrics/editor/publish panel. Include focus management, terminal-size adaptation, command routing, and no-overlap layout.
   Must NOT do: Do not add business logic directly to view rendering.
@@ -418,8 +418,8 @@ Critical path: Task 1 -> Task 2 -> Task 6 -> Task 11 -> Task 13 -> Task 15 -> Ta
   - Lip Gloss v2: `https://pkg.go.dev/github.com/charmbracelet/lipgloss/v2`.
 
   Acceptance criteria:
-  - [ ] RED test first for focus routing and resize behavior.
-  - [ ] `go test ./internal/tui -run 'Test.*Layout|Test.*Focus' -v` exits 0.
+  - [x] RED test first for focus routing and resize behavior.
+  - [x] `go test ./internal/tui -run 'Test.*Layout|Test.*Focus' -v` exits 0.
 
   QA scenarios:
   ```
@@ -432,7 +432,7 @@ Critical path: Task 1 -> Task 2 -> Task 6 -> Task 11 -> Task 13 -> Task 15 -> Ta
 
   Commit: YES | Message: `feat(tui): add three panel shell` | Files: [`internal/tui/`, `cmd/lyrike-studio-tui/`]
 
-- [ ] 12. Add ASCII waveform and transport controls
+- [x] 12. Add ASCII waveform and transport controls
 
   What to do: Render normalized peaks as an ASCII waveform/timeline with cursor, zoom, loop region, seek actions, play/pause, and active line following playback time.
   Must NOT do: Do not use browser waveform libraries.
@@ -445,8 +445,8 @@ Critical path: Task 1 -> Task 2 -> Task 6 -> Task 11 -> Task 13 -> Task 15 -> Ta
   - TUI shell from Task 11: `internal/tui`.
 
   Acceptance criteria:
-  - [ ] RED tests first for peak-to-cell mapping, seek mapping, and loop bounds.
-  - [ ] `go test ./internal/tui/... -run 'Test.*Waveform|Test.*Transport' -v` exits 0.
+  - [x] RED tests first for peak-to-cell mapping, seek mapping, and loop bounds.
+  - [x] `go test ./internal/tui/... -run 'Test.*Waveform|Test.*Transport' -v` exits 0.
 
   QA scenarios:
   ```
@@ -459,7 +459,7 @@ Critical path: Task 1 -> Task 2 -> Task 6 -> Task 11 -> Task 13 -> Task 15 -> Ta
 
   Commit: YES | Message: `feat(tui): render ascii waveform controls` | Files: [`internal/tui/`, `internal/playback/`]
 
-- [ ] 13. Add lyrics editor interactions
+- [x] 13. Add lyrics editor interactions
 
   What to do: Implement synced/plain/meta tabs, inline text editing, line navigation, timestamp tap, insert/delete/reorder, undo/redo, and draft dirty-state indication.
   Must NOT do: Do not implement collaborative editing or AI rewriting.
@@ -472,8 +472,8 @@ Critical path: Task 1 -> Task 2 -> Task 6 -> Task 11 -> Task 13 -> Task 15 -> Ta
   - TUI shell from Task 11: `internal/tui`.
 
   Acceptance criteria:
-  - [ ] RED tests first for keyboard messages and resulting document state.
-  - [ ] `go test ./internal/tui/... -run 'Test.*Lyrics|Test.*Undo|Test.*Redo|Test.*Tap' -v` exits 0.
+  - [x] RED tests first for keyboard messages and resulting document state.
+  - [x] `go test ./internal/tui/... -run 'Test.*Lyrics|Test.*Undo|Test.*Redo|Test.*Tap' -v` exits 0.
 
   QA scenarios:
   ```
@@ -486,7 +486,7 @@ Critical path: Task 1 -> Task 2 -> Task 6 -> Task 11 -> Task 13 -> Task 15 -> Ta
 
   Commit: YES | Message: `feat(tui): add lyrics editing workflow` | Files: [`internal/tui/`, `internal/domain/lyrics/`, `internal/domain/history/`]
 
-- [ ] 14. Add publish flow panel
+- [x] 14. Add publish flow panel
 
   What to do: Add publish validation, challenge request, local PoW solver or compatible token flow, publish submission, retry, and deterministic step status display.
   Must NOT do: Do not change LRCLIB API contracts. Do not block TUI rendering during PoW.
@@ -500,8 +500,8 @@ Critical path: Task 1 -> Task 2 -> Task 6 -> Task 11 -> Task 13 -> Task 15 -> Ta
   - Spec: `/home/duckviet/lrclib-upload/docs/specs/005-publish-migration.md`.
 
   Acceptance criteria:
-  - [ ] RED tests first for Validate -> PoW -> Publish -> Done and failure retry.
-  - [ ] `go test ./internal/tui/... ./internal/integrations/backend/... -run 'Test.*Publish' -v` exits 0.
+  - [x] RED tests first for Validate -> PoW -> Publish -> Done and failure retry.
+  - [x] `go test ./internal/tui/... ./internal/integrations/backend/... -run 'Test.*Publish' -v` exits 0.
 
   QA scenarios:
   ```
@@ -514,7 +514,7 @@ Critical path: Task 1 -> Task 2 -> Task 6 -> Task 11 -> Task 13 -> Task 15 -> Ta
 
   Commit: YES | Message: `feat(tui): add publish workflow panel` | Files: [`internal/tui/`, `internal/integrations/backend/`]
 
-- [ ] 15. Add end-to-end TUI QA harness
+- [x] 15. Add end-to-end TUI QA harness
 
   What to do: Add deterministic demo mode or fixture harness that runs the full TUI against fake backend and fake mpv/player. Drive it with tmux and capture transcript evidence.
   Must NOT do: Do not rely on network, real YouTube, real mpv, or human keystrokes for CI-smoke behavior.
@@ -527,9 +527,9 @@ Critical path: Task 1 -> Task 2 -> Task 6 -> Task 11 -> Task 13 -> Task 15 -> Ta
   - Playback fake from Task 3: `internal/playback`.
 
   Acceptance criteria:
-  - [ ] `go test ./...` exits 0.
-  - [ ] `go run ./cmd/lyrike-studio-tui --demo --backend-fixture` can be driven in tmux.
-  - [ ] Captured tmux transcript contains fetch, playback, tap-sync, draft save, publish success, and quit.
+  - [x] `go test ./...` exits 0.
+  - [x] `go run ./cmd/lyrike-studio-tui --demo --backend-fixture` can be driven in tmux.
+  - [x] Captured tmux transcript contains fetch, playback, tap-sync, draft save, publish success, and quit.
 
   QA scenarios:
   ```
@@ -542,7 +542,7 @@ Critical path: Task 1 -> Task 2 -> Task 6 -> Task 11 -> Task 13 -> Task 15 -> Ta
 
   Commit: YES | Message: `test(tui): add tmux demo qa harness` | Files: [`cmd/lyrike-studio-tui/`, `internal/tui/`, `internal/testfixtures/`]
 
-- [ ] 16. Write docs and operator guidance
+- [x] 16. Write docs and operator guidance
 
   What to do: Document install, mpv startup, backend URL, keybindings, draft location, troubleshooting, and the precise boundaries between the TUI repo and `/home/duckviet/lrclib-upload`.
   Must NOT do: Do not document unimplemented features.
@@ -555,9 +555,9 @@ Critical path: Task 1 -> Task 2 -> Task 6 -> Task 11 -> Task 13 -> Task 15 -> Ta
   - mpv IPC docs: `https://mpv.io/manual/stable/#options-input-ipc-server`.
 
   Acceptance criteria:
-  - [ ] `README.md` includes runnable commands for demo, real backend, and mpv IPC mode.
-  - [ ] `docs/keybindings.md` lists every implemented keybinding.
-  - [ ] `docs/troubleshooting.md` covers missing mpv, backend unavailable, corrupt draft, and publish failure.
+  - [x] `README.md` includes runnable commands for demo, real backend, and mpv IPC mode.
+  - [x] `docs/keybindings.md` lists every implemented keybinding.
+  - [x] `docs/troubleshooting.md` covers missing mpv, backend unavailable, corrupt draft, and publish failure.
 
   QA scenarios:
   ```
@@ -570,7 +570,7 @@ Critical path: Task 1 -> Task 2 -> Task 6 -> Task 11 -> Task 13 -> Task 15 -> Ta
 
   Commit: YES | Message: `docs: document tui operation` | Files: [`README.md`, `docs/`]
 
-- [ ] 17. Final verification, review, cleanup, and handoff
+- [x] 17. Final verification, review, cleanup, and handoff
 
   What to do: Run the full automated gate, targeted backend regression gate, tmux manual QA, LSP/diagnostics if configured, and final review. Confirm no live tmux sessions, bound ports, temp dirs, or background processes remain.
   Must NOT do: Do not declare complete from tests alone. Do not leave QA state running.
@@ -583,14 +583,14 @@ Critical path: Task 1 -> Task 2 -> Task 6 -> Task 11 -> Task 13 -> Task 15 -> Ta
   - Git history: `git log --oneline --decorate -n 20`.
 
   Acceptance criteria:
-  - [ ] `go test ./...` exits 0.
-  - [ ] `go test -race ./...` exits 0.
-  - [ ] `go vet ./...` exits 0.
-  - [ ] Backend targeted pytest exits 0.
-  - [ ] Full tmux TUI scenario PASS evidence exists.
-  - [ ] Reviewer approval is unconditional if review gate is triggered.
-  - [ ] `tmux ls` shows no `ulw-qa-*` sessions.
-  - [ ] `git status --short` contains only intended changes or is clean after approved commits.
+  - [x] `go test ./...` exits 0.
+  - [x] `go test -race ./...` exits 0.
+  - [x] `go vet ./...` exits 0.
+  - [x] Backend targeted pytest exits 0.
+  - [x] Full tmux TUI scenario PASS evidence exists.
+  - [x] Reviewer approval is unconditional if review gate is triggered.
+  - [x] `tmux ls` shows no `ulw-qa-*` sessions.
+  - [x] `git status --short` contains only intended changes or is clean after approved commits.
 
   QA scenarios:
   ```
@@ -617,10 +617,10 @@ Critical path: Task 1 -> Task 2 -> Task 6 -> Task 11 -> Task 13 -> Task 15 -> Ta
 
 ## Final Verification Wave
 > Runs after all implementation tasks. All must pass before completion.
-- [ ] F1. Plan compliance audit - every task done, every acceptance criterion met, every evidence file exists.
-- [ ] F2. Code quality review - diagnostics clean, idioms match, no dead code, no oversized source file without explicit `SIZE_OK` rationale.
-- [ ] F3. Real manual QA - every tmux, HTTP, and CLI scenario executed with evidence captured.
-- [ ] F4. Scope fidelity - no browser UI, WaveSurfer, iframe, Windows named-pipe, or word tap-sync introduced.
+- [x] F1. Plan compliance audit - every task done, every acceptance criterion met, every evidence file exists.
+- [x] F2. Code quality review - diagnostics clean, idioms match, no dead code, no oversized source file without explicit `SIZE_OK` rationale.
+- [x] F3. Real manual QA - every tmux, HTTP, and CLI scenario executed with evidence captured.
+- [x] F4. Scope fidelity - no browser UI, WaveSurfer, iframe, Windows named-pipe, or word tap-sync introduced.
 
 ## Commit Strategy
 - One logical change per commit. Use Conventional Commits: `<type>(<scope>): <imperative summary>`.
@@ -633,4 +633,3 @@ Critical path: Task 1 -> Task 2 -> Task 6 -> Task 11 -> Task 13 -> Task 15 -> Ta
 - The executor can start at Task 1 without further interview.
 - Every task has references, acceptance criteria, concrete QA scenarios, evidence paths, and commit instructions.
 - Final delivery is not complete until the TUI has been driven through tmux and the backend regression has been driven through pytest/HTTP evidence.
-

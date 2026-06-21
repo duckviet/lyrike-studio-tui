@@ -6,27 +6,26 @@ type WordTiming struct {
 }
 
 type Line struct {
-	timestamp Timestamp
-	text      Text
-	words     []WordTiming
+	start Timestamp
+	end   Timestamp
+	text  Text
+	words []WordTiming
 }
 
 func NewWordTiming(timestamp Timestamp, text Text) (WordTiming, error) {
-	if text.String() == "" {
-		return WordTiming{}, newValidationError(CodeEmptyText, 0, "word", "", "enhanced lyric word must not be empty")
-	}
 	return WordTiming{timestamp: timestamp, text: text}, nil
 }
 
-func NewLine(timestamp Timestamp, text Text) (Line, error) {
-	if text.String() == "" {
-		return Line{}, newValidationError(CodeEmptyText, 0, "text", "", "lyric text must not be empty")
+func NewLine(start Timestamp, end Timestamp, text Text) (Line, error) {
+	if start.Milliseconds() >= end.Milliseconds() {
+		return Line{}, newValidationError(CodeInvalidSegment, 0, "segment", "",
+			"segment start must be before end")
 	}
-	return Line{timestamp: timestamp, text: text}, nil
+	return Line{start: start, end: end, text: text}, nil
 }
 
-func NewEnhancedLine(timestamp Timestamp, text Text, words []WordTiming) (Line, error) {
-	line, err := NewLine(timestamp, text)
+func NewEnhancedLine(start Timestamp, end Timestamp, text Text, words []WordTiming) (Line, error) {
+	line, err := NewLine(start, end, text)
 	if err != nil {
 		return Line{}, err
 	}
@@ -42,8 +41,17 @@ func NewEnhancedLine(timestamp Timestamp, text Text, words []WordTiming) (Line, 
 	return line, nil
 }
 
+func (l Line) Start() Timestamp {
+	return l.start
+}
+
+func (l Line) End() Timestamp {
+	return l.end
+}
+
+// Timestamp returns the start timestamp. Kept as alias for backward compat in formatters.
 func (l Line) Timestamp() Timestamp {
-	return l.timestamp
+	return l.start
 }
 
 func (l Line) Text() Text {
@@ -52,6 +60,18 @@ func (l Line) Text() Text {
 
 func (l Line) Words() []WordTiming {
 	return append([]WordTiming(nil), l.words...)
+}
+
+func (l Line) WithStart(start Timestamp) Line {
+	return Line{start: start, end: l.end, text: l.text, words: append([]WordTiming(nil), l.words...)}
+}
+
+func (l Line) WithEnd(end Timestamp) Line {
+	return Line{start: l.start, end: end, text: l.text, words: append([]WordTiming(nil), l.words...)}
+}
+
+func (l Line) WithText(text Text) Line {
+	return Line{start: l.start, end: l.end, text: text, words: append([]WordTiming(nil), l.words...)}
 }
 
 func (w WordTiming) Timestamp() Timestamp {

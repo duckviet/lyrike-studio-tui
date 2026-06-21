@@ -72,7 +72,7 @@ func parseTimestamp(input string, line int, field string) (Timestamp, error) {
 }
 
 func invalidTimestamp(line int, field string, value string) *ValidationError {
-	return newValidationError(CodeInvalidTimestamp, line, field, value, "timestamp must use mm:ss.xx with seconds from 00 to 59")
+	return newValidationError(CodeInvalidTimestamp, line, field, value, "invalid timestamp: must use mm:ss.xx with seconds from 00 to 59")
 }
 
 func allDigits(input string) bool {

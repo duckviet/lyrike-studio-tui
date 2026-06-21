@@ -9,6 +9,9 @@ const (
 	CodeEmptyText               ErrorCode = "empty_text"
 	CodeDuplicateTimestamp      ErrorCode = "duplicate_timestamp"
 	CodeInvalidTimestamp        ErrorCode = "invalid_timestamp"
+	CodeInvalidIndex            ErrorCode = "invalid_index"
+	CodeInvalidSegment          ErrorCode = "invalid_segment"
+	CodeOverlappingSegment      ErrorCode = "overlapping_segment"
 	CodeMalformedEnhancedMarker ErrorCode = "malformed_enhanced_marker"
 	CodeMalformedLine           ErrorCode = "malformed_line"
 	CodeUnsortedTimestamp       ErrorCode = "unsorted_timestamp"
@@ -41,3 +44,9 @@ func newValidationError(code ErrorCode, line int, field string, value string, me
 		Message: message,
 	}
 }
+
+// NewValidationErrorPublic creates a validation error for use by external packages.
+func NewValidationErrorPublic(code ErrorCode, message string) *ValidationError {
+	return &ValidationError{Code: code, Message: message}
+}
+
