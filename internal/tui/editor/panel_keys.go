@@ -1,6 +1,10 @@
 package editor
 
 import (
+	"fmt"
+	"os"
+	"strings"
+
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/duckviet/lyrike-studio-tui/internal/domain/history"
@@ -23,6 +27,68 @@ func (p Panel) handleKey(key tea.KeyPressMsg) (Panel, tea.Cmd) {
 			p.ShowHelp = false
 			p.Title = "Lyrics"
 			return p, nil
+		}
+		return p, nil
+	}
+
+	if p.Importing {
+		runes := []rune(p.InputText)
+		if key.Code == tea.KeyEnter {
+			filePath := strings.TrimSpace(p.InputText)
+			content, err := os.ReadFile(filePath)
+			if err != nil {
+				p.lastErr = fmt.Errorf("read file failed: %w", err)
+			} else {
+				doc, err := lyrics.ParseLyrics(string(content))
+				if err != nil {
+					p.lastErr = fmt.Errorf("parse failed: %w", err)
+				} else {
+					p.Document = doc
+					p.selected = 0
+					p.lastErr = nil
+					p.Importing = false
+					p.InputText = ""
+					p.cursorPos = 0
+					p.manager = history.NewManager()
+				}
+			}
+			return p, nil
+		}
+		if key.Code == tea.KeyEscape {
+			p.Importing = false
+			p.InputText = ""
+			p.cursorPos = 0
+			p.lastErr = nil
+			return p, nil
+		}
+		if key.Code == tea.KeyLeft {
+			p.cursorPos = max(0, p.cursorPos-1)
+			return p, nil
+		}
+		if key.Code == tea.KeyRight {
+			p.cursorPos = min(len(runes), p.cursorPos+1)
+			return p, nil
+		}
+		if key.Code == tea.KeyBackspace {
+			if p.cursorPos > 0 {
+				runes = append(runes[:p.cursorPos-1], runes[p.cursorPos:]...)
+				p.InputText = string(runes)
+				p.cursorPos--
+			}
+			return p, nil
+		}
+		if key.Code == tea.KeyDelete {
+			if p.cursorPos < len(runes) {
+				runes = append(runes[:p.cursorPos], runes[p.cursorPos+1:]...)
+				p.InputText = string(runes)
+			}
+			return p, nil
+		}
+		if key.Text != "" && (key.Mod&(tea.ModCtrl|tea.ModAlt)) == 0 {
+			insertRunes := []rune(key.Text)
+			runes = append(runes[:p.cursorPos], append(insertRunes, runes[p.cursorPos:]...)...)
+			p.InputText = string(runes)
+			p.cursorPos += len(insertRunes)
 		}
 		return p, nil
 	}
@@ -95,13 +161,23 @@ func (p Panel) handleKey(key tea.KeyPressMsg) (Panel, tea.Cmd) {
 	case key.Code == tea.KeyDown || key.Code == 'j':
 		if len(p.Document.Lines()) > 0 {
 			p.selected = min(p.selected+1, len(p.Document.Lines())-1)
-			return p, p.seekToSelectedCmd()
+			return p, nil
 		}
 	case key.Code == tea.KeyUp || key.Code == 'k':
 		if len(p.Document.Lines()) > 0 {
 			p.selected = max(p.selected-1, 0)
+			return p, nil
+		}
+	case key.Code == 'g':
+		if len(p.Document.Lines()) > 0 {
 			return p, p.seekToSelectedCmd()
 		}
+	case key.Code == 'f' || (key.Code == 'f' && key.Mod == tea.ModCtrl):
+		activeIdx := p.activeLineIndex()
+		if activeIdx != -1 {
+			p.selected = activeIdx
+		}
+		return p, nil
 	case key.Code == 'J' && key.Mod == tea.ModShift: // Swap text down
 		if p.selected+1 < len(p.Document.Lines()) {
 			p = p.apply(history.SwapText{Index: p.selected})
@@ -118,6 +194,11 @@ func (p Panel) handleKey(key tea.KeyPressMsg) (Panel, tea.Cmd) {
 			p.InputText = p.Document.Lines()[p.selected].Text().String()
 			p.cursorPos = len([]rune(p.InputText))
 		}
+	case key.Code == 'I': // Import lyric from file
+		p.Importing = true
+		p.InputText = ""
+		p.cursorPos = 0
+		p.lastErr = nil
 		return p, nil
 	case key.Code == 'i': // Insert before selected
 		idx := p.selected

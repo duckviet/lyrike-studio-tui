@@ -12,6 +12,7 @@ const (
 	keyActionTogglePlayback
 	keyActionSeekBackward
 	keyActionSeekForward
+	keyActionToggleFollow
 	keyActionQuit
 )
 
@@ -46,6 +47,8 @@ func nonEditingRootKeyAction(key tea.KeyPressMsg) keyAction {
 		return keyActionSeekBackward
 	case key.Code == tea.KeyRight:
 		return keyActionSeekForward
+	case key.Code == 'f' && key.Mod == 0:
+		return keyActionToggleFollow
 	case key.Code == 'q' && key.Mod == 0:
 		return keyActionQuit
 	default:
@@ -54,5 +57,5 @@ func nonEditingRootKeyAction(key tea.KeyPressMsg) keyAction {
 }
 
 func (m Model) editorEditModeOwnsKey() bool {
-	return m.focus == focusEditor && m.editor.Editing
+	return m.focus == focusEditor && (m.editor.Editing || m.editor.Importing)
 }

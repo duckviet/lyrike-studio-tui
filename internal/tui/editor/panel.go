@@ -21,6 +21,7 @@ type Panel struct {
 	playbackPositionMS int64
 	lastErr            error
 	Editing            bool
+	Importing          bool
 	InputText          string
 	cursorPos          int
 	ShowHelp           bool
@@ -37,6 +38,8 @@ var helpLines = []string{
 	"  Tab / Shift-Tab : Focus next/prev panel",
 	"  j / k           : Move selection down/up",
 	"  Down / Up       : Move selection down/up",
+	"  g               : Seek playback to selected line",
+	"  f / Ctrl-F      : Snap selection to active playing line",
 	"",
 	"Playback:",
 	"  Space           : Play / Pause outside text edit",
@@ -61,6 +64,7 @@ var helpLines = []string{
 	"",
 	"Commands & File:",
 	"  Ctrl-S          : Save draft snapshot",
+	"  I               : Import lyrics from file",
 	"  p               : Publish lyrics to server",
 	"  h / ?           : Toggle help menu",
 	"  q               : Quit application",
@@ -123,6 +127,27 @@ func (p Panel) WithSelected(index int) Panel {
 }
 
 func (p Panel) View(_ int, height int) string {
+	if p.Importing {
+		var builder strings.Builder
+		builder.WriteString("Import Lyrics from File\n")
+		builder.WriteString("Enter path to .lrc or .txt file:\n")
+
+		runes := []rune(p.InputText)
+		if p.cursorPos > len(runes) {
+			p.cursorPos = len(runes)
+		}
+		pathStr := string(runes[:p.cursorPos]) + "|" + string(runes[p.cursorPos:])
+		builder.WriteString("> " + pathStr + "\n\n")
+
+		if p.lastErr != nil {
+			errStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#FF3366"))
+			builder.WriteString(errStyle.Render("Error: " + p.lastErr.Error()) + "\n\n")
+		}
+
+		builder.WriteString("(Press Enter to import, Esc to cancel)")
+		return builder.String()
+	}
+
 	if p.ShowHelp {
 		maxScroll := len(helpLines) - height
 		if maxScroll < 0 {
@@ -182,7 +207,7 @@ func (p Panel) View(_ int, height int) string {
 			text = "[Edit]: " + string(runes[:p.cursorPos]) + "|" + string(runes[p.cursorPos:])
 		}
 		timeRange := fmt.Sprintf("%s-%s", line.Start().String(), line.End().String())
-		lineStr := fmt.Sprintf("%s%s%s %s", marker, playMarker, timeRange, text)
+		lineStr := fmt.Sprintf("%s%s%s |   %s", marker, playMarker, timeRange, text)
 
 		if index == activeIdx {
 			lineStr = activeLineStyle.Render(lineStr)

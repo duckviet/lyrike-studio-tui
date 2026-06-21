@@ -232,3 +232,39 @@ func MustTextForTest(t *testing.T, input string) Text {
 	}
 	return text
 }
+
+func TestParseLyrics(t *testing.T) {
+	t.Parallel()
+
+	// Test 1: Valid LRC input
+	lrcInput := "[00:01.00]Line 1\n[00:03.00]Line 2"
+	doc, err := ParseLyrics(lrcInput)
+	if err != nil {
+		t.Fatalf("ParseLyrics(lrc) failed: %v", err)
+	}
+	lines := doc.Lines()
+	if len(lines) != 2 {
+		t.Fatalf("ParseLyrics(lrc) lines len = %d, want 2", len(lines))
+	}
+	assertLine(t, lines[0], 1000, 3000, "Line 1")
+	assertLine(t, lines[1], 3000, 13000, "Line 2")
+
+	// Test 2: Plain text input
+	plainInput := "First plain line\nSecond plain line"
+	docPlain, err := ParseLyrics(plainInput)
+	if err != nil {
+		t.Fatalf("ParseLyrics(plain) failed: %v", err)
+	}
+	linesPlain := docPlain.Lines()
+	if len(linesPlain) != 2 {
+		t.Fatalf("ParseLyrics(plain) lines len = %d, want 2", len(linesPlain))
+	}
+	assertLine(t, linesPlain[0], 0, 3000, "First plain line")
+	assertLine(t, linesPlain[1], 3000, 6000, "Second plain line")
+
+	// Test 3: Empty input
+	_, err = ParseLyrics("\n   \n")
+	if err == nil {
+		t.Fatal("ParseLyrics(empty) succeeded, want error")
+	}
+}

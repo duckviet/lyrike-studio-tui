@@ -168,3 +168,82 @@ func testDocument(t *testing.T) lyrics.Document {
 	}
 	return doc
 }
+
+func TestLyricsKeyboardImportToggleAndCancel(t *testing.T) {
+	t.Parallel()
+
+	panel := NewPanel(testDocument(t))
+
+	// Enter importing mode
+	panel, _ = panel.Update(tea.KeyPressMsg{Code: 'I'})
+	if !panel.Importing {
+		t.Fatal("expected Importing to be true after pressing 'I'")
+	}
+
+	// Type some characters
+	for _, char := range "some/path.txt" {
+		panel, _ = panel.Update(tea.KeyPressMsg{Text: string(char)})
+	}
+
+	if panel.InputText != "some/path.txt" {
+		t.Fatalf("expected InputText to be 'some/path.txt', got %q", panel.InputText)
+	}
+
+	// Press escape to cancel
+	panel, _ = panel.Update(tea.KeyPressMsg{Code: tea.KeyEscape})
+	if panel.Importing {
+		t.Fatal("expected Importing to be false after escape")
+	}
+	if panel.InputText != "" {
+		t.Fatalf("expected InputText to be empty after escape, got %q", panel.InputText)
+	}
+}
+
+func TestLyricsKeyboardNavigationDoesNotSeek(t *testing.T) {
+	t.Parallel()
+
+	panel := NewPanel(testDocument(t))
+
+	// Move selection down
+	panel, cmd := panel.Update(tea.KeyPressMsg{Code: tea.KeyDown})
+	if panel.selected != 1 {
+		t.Fatalf("expected selected to be 1, got %d", panel.selected)
+	}
+	if cmd != nil {
+		t.Fatal("expected no command (no seek) on KeyDown navigation")
+	}
+
+	// Press 'g' to explicitly seek to selected line
+	_, cmd = panel.Update(tea.KeyPressMsg{Code: 'g'})
+	if cmd == nil {
+		t.Fatal("expected seek command when pressing 'g'")
+	}
+}
+
+func TestLyricsKeyboardSnapToActive(t *testing.T) {
+	t.Parallel()
+
+	panel := NewPanel(testDocument(t)).WithPlaybackPosition(5000)
+
+	if panel.selected != 0 {
+		t.Fatalf("expected initial selected to be 0, got %d", panel.selected)
+	}
+
+	panel, _ = panel.Update(tea.KeyPressMsg{Code: 'f'})
+	if panel.selected != 1 {
+		t.Fatalf("expected selected to snap to active line index 1, got %d", panel.selected)
+	}
+
+	panel, _ = panel.Update(tea.KeyPressMsg{Code: tea.KeyUp})
+	if panel.selected != 0 {
+		t.Fatalf("expected selected to be 0, got %d", panel.selected)
+	}
+
+	panel, _ = panel.Update(tea.KeyPressMsg{Code: 'f', Mod: tea.ModCtrl})
+	if panel.selected != 1 {
+		t.Fatalf("expected selected to snap to active line index 1 via Ctrl-F, got %d", panel.selected)
+	}
+}
+
+
+

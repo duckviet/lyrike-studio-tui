@@ -28,6 +28,7 @@ type Panel struct {
 
 	hoverCol int
 	lines    []lyrics.Line
+	follow   bool
 }
 
 var (
@@ -49,6 +50,7 @@ func NewPanel() Panel {
 		viewStartMS: 0,
 		viewEndMS:   10_000,
 		hoverCol:    -1,
+		follow:      true,
 	}
 	return p.updateTitle()
 }
@@ -64,6 +66,9 @@ func NewPanelWithPeaks(peaks []float64, durationMS int64) Panel {
 
 func (p Panel) WithPosition(positionMS int64) Panel {
 	p.positionMS = clamp(positionMS, 0, p.durationMS)
+	if p.follow {
+		p = p.centerViewportOnPosition()
+	}
 	return p.updateTitle()
 }
 
@@ -176,6 +181,7 @@ func (p Panel) zoomAt(mouseCol int, factor float64) Panel {
 }
 
 func (p Panel) pan(deltaMS int64) Panel {
+	p.follow = false
 	span := p.viewSpanMS()
 	newStart := p.viewStartMS + deltaMS
 	if newStart < 0 {
@@ -233,6 +239,8 @@ func (p Panel) Update(msg tea.Msg) (Panel, tea.Cmd) {
 			p.viewStartMS = 0
 			p.viewEndMS = p.durationMS
 			p = p.updateTitle()
+		case 'f', 'F':
+			p = p.ToggleFollow()
 		}
 	}
 	return p, nil
@@ -275,11 +283,43 @@ func (p Panel) zoomStatus() string {
 }
 
 func (p Panel) updateTitle() Panel {
-	if p.viewSpanMS() == p.durationMS {
-		p.Title = "Waveform"
-	} else {
-		p.Title = fmt.Sprintf("Waveform [%s]", p.zoomStatus())
+	followStr := ""
+	if p.follow {
+		followStr = " [Follow]"
 	}
+	if p.viewSpanMS() == p.durationMS {
+		p.Title = "Waveform" + followStr
+	} else {
+		p.Title = fmt.Sprintf("Waveform [%s]%s", p.zoomStatus(), followStr)
+	}
+	return p
+}
+
+func (p Panel) ToggleFollow() Panel {
+	p.follow = !p.follow
+	p = p.updateTitle()
+	if p.follow {
+		p = p.centerViewportOnPosition()
+	}
+	return p
+}
+
+func (p Panel) centerViewportOnPosition() Panel {
+	span := p.viewSpanMS()
+	newStart := p.positionMS - span/2
+	newEnd := newStart + span
+
+	if newStart < 0 {
+		newStart = 0
+		newEnd = span
+	}
+	if newEnd > p.durationMS {
+		newEnd = p.durationMS
+		newStart = newEnd - span
+	}
+
+	p.viewStartMS = clamp(newStart, 0, p.durationMS)
+	p.viewEndMS = clamp(newEnd, p.viewStartMS+1, p.durationMS)
 	return p
 }
 

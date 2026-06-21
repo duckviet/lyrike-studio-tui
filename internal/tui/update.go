@@ -87,9 +87,6 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.media = m.media.WithTransport(state, snapshot.Position.Milliseconds(), snapshot.Duration.Milliseconds())
 				m.waveform = m.waveform.WithPosition(snapshot.Position.Milliseconds())
 				m.editor = m.editor.WithPlaybackPosition(snapshot.Position.Milliseconds())
-				if snapshot.State == playback.StatePlaying {
-					m = m.followActiveLine(snapshot.Position.Milliseconds())
-				}
 			}
 		}
 		return m, tea.Batch(tickCmd(), cmd)
@@ -137,23 +134,6 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 	return m, nil
-}
-
-func (m Model) followActiveLine(pos int64) Model {
-	lines := m.editor.Document.Lines()
-	if len(lines) == 0 {
-		return m
-	}
-	index := -1
-	for i, line := range lines {
-		if line.Start().Milliseconds() <= pos {
-			index = i
-		}
-	}
-	if index != -1 {
-		m.editor = m.editor.WithSelected(index)
-	}
-	return m
 }
 
 func (m Model) requestAndSolveChallengeCmd() tea.Cmd {

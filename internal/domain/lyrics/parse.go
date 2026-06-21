@@ -222,3 +222,39 @@ func withLine(err error, lineNumber int) error {
 	}
 	return err
 }
+
+func ParseLyrics(input string) (Document, error) {
+	// Try parsing as LRC first
+	doc, err := ParseLRC(input)
+	if err == nil {
+		return doc, nil
+	}
+
+	// Fallback to parsing line-by-line as plain text
+	normalized := strings.ReplaceAll(input, "\r\n", "\n")
+	var lines []Line
+	var timeOffset int64 = 0
+
+	for _, raw := range strings.Split(normalized, "\n") {
+		row := strings.TrimSpace(raw)
+		if row == "" {
+			continue
+		}
+		startTS, _ := NewTimestamp(timeOffset)
+		endTS, _ := NewTimestamp(timeOffset + 3000)
+		txt, _ := NewText(row)
+		line, err := NewLine(startTS, endTS, txt)
+		if err != nil {
+			return Document{}, err
+		}
+		lines = append(lines, line)
+		timeOffset += 3000
+	}
+
+	if len(lines) == 0 {
+		return Document{}, newValidationError(CodeEmptyDocument, 0, "lines", "", "document must contain at least one lyric line")
+	}
+
+	return NewDocument(lines)
+}
+

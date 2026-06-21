@@ -82,3 +82,35 @@ func TestWaveformRenderLyricTrack(t *testing.T) {
 	}
 }
 
+func TestWaveformFollowMode(t *testing.T) {
+	t.Parallel()
+
+	panel := NewPanelWithPeaks([]float64{0.5}, 10_000)
+	panel.viewStartMS = 0
+	panel.viewEndMS = 5000
+	panel.follow = true
+
+	panel = panel.WithPosition(4000)
+
+	if panel.viewStartMS != 1500 || panel.viewEndMS != 6500 {
+		t.Fatalf("expected viewport [1500, 6500], got [%d, %d]", panel.viewStartMS, panel.viewEndMS)
+	}
+
+	panel = panel.ToggleFollow()
+	if panel.follow {
+		t.Fatal("expected follow to be false after toggle")
+	}
+
+	panel = panel.WithPosition(8000)
+	if panel.viewStartMS != 1500 || panel.viewEndMS != 6500 {
+		t.Fatalf("expected viewport to remain [1500, 6500], got [%d, %d]", panel.viewStartMS, panel.viewEndMS)
+	}
+
+	panel = panel.ToggleFollow()
+	panel = panel.pan(500)
+	if panel.follow {
+		t.Fatal("expected follow to be disabled after panning")
+	}
+}
+
+

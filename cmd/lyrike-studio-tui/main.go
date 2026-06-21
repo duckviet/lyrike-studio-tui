@@ -33,6 +33,7 @@ func main() {
 	videoID := flag.String("video-id", "", "YouTube video ID to sync")
 	sourceURL := flag.String("url", "", "Source media URL to sync")
 	audioPath := flag.String("audio", "", "Path to the local audio file to play natively via beep")
+	importPath := flag.String("import", "", "Path to a lyric file (.lrc or .txt) to import at startup")
 
 	flag.Parse()
 
@@ -49,7 +50,7 @@ func main() {
 		return
 	}
 
-	if err := runReal(*backendURL, *mpvSocket, *videoID, *sourceURL, *audioPath); err != nil {
+	if err := runReal(*backendURL, *mpvSocket, *videoID, *sourceURL, *audioPath, *importPath); err != nil {
 		fmt.Fprintf(os.Stderr, "lyrike-studio-tui: error: %v\n", err)
 		os.Exit(1)
 	}
@@ -75,7 +76,7 @@ func runDemo(backendFixture bool) error {
 	return err
 }
 
-func runReal(backendURL, mpvSocket, videoID, sourceURL, audioPath string) error {
+func runReal(backendURL, mpvSocket, videoID, sourceURL, audioPath, importPath string) error {
 	client := backend.NewClient(backendURL)
 
 	var player playback.Player
@@ -124,17 +125,33 @@ func runReal(backendURL, mpvSocket, videoID, sourceURL, audioPath string) error 
 		}
 	}
 
-	// Try loading saved draft if videoID is set
+	// Try loading draft or imported lyrics
 	doc := defaultDocument()
-	store := storage.NewDefaultStore()
-	idStr := videoID
-	if idStr == "" {
-		idStr = "default"
-	}
-	if id, err := draft.NewDraftID(idStr); err == nil {
-		if snapshot, err := store.Load(id); err == nil {
-			doc = snapshot.Document
-			statusMsg += " | loaded saved draft for " + idStr
+
+	if importPath != "" {
+		content, err := os.ReadFile(importPath)
+		if err == nil {
+			if parsedDoc, err := lyrics.ParseLyrics(string(content)); err == nil {
+				doc = parsedDoc
+				statusMsg += " | imported lyrics from " + importPath
+			} else {
+				statusMsg += " | failed to parse import file: " + err.Error()
+			}
+		} else {
+			statusMsg += " | failed to read import file: " + err.Error()
+		}
+	} else {
+		// Try loading saved draft if videoID is set
+		store := storage.NewDefaultStore()
+		idStr := videoID
+		if idStr == "" {
+			idStr = "default"
+		}
+		if id, err := draft.NewDraftID(idStr); err == nil {
+			if snapshot, err := store.Load(id); err == nil {
+				doc = snapshot.Document
+				statusMsg += " | loaded saved draft for " + idStr
+			}
 		}
 	}
 

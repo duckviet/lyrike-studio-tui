@@ -21,6 +21,9 @@ func (m Model) updateKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	if m.editorEditModeOwnsKey() {
 		return m.updateFocusedPanel(msg)
 	}
+	if m.focus == focusEditor && (msg.Code == 'f' || (msg.Code == 'f' && msg.Mod == tea.ModCtrl)) {
+		return m.updateFocusedPanel(msg)
+	}
 	if action := nonEditingRootKeyAction(msg); action != keyActionNone {
 		return m.applyRootKeyAction(action)
 	}
@@ -41,6 +44,8 @@ func (m Model) applyRootKeyAction(action keyAction) (tea.Model, tea.Cmd) {
 		m = m.seekPlayback(-1000)
 	case keyActionSeekForward:
 		m = m.seekPlayback(1000)
+	case keyActionToggleFollow:
+		m.waveform = m.waveform.ToggleFollow()
 	case keyActionQuit:
 		m.status = []string{"quit ready"}
 		return m, tea.Quit
