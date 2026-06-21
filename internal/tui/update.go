@@ -28,10 +28,17 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case tea.KeyPressMsg:
+		if m.picker.active() {
+			return m.updateProjectPicker(msg)
+		}
+		if m.metadataEditor.active {
+			return m.updateMetadataEditor(msg)
+		}
 		return m.updateKey(msg)
 
 	case tea.MouseMsg:
-		m = m.handleMouse(msg)
+		_, isMotion := msg.(tea.MouseMotionMsg)
+		m = m.handleMouse(msg, isMotion)
 		return m, nil
 
 	case fetchMediaMsg:
@@ -47,7 +54,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				fp.SetDuration(dur)
 			}
 		}
-		m.media = m.media.WithMetadata(m.trackName, m.artistName).
+		m.media = m.media.WithMetadata(m.trackName, m.artistName, m.albumName).
 			WithTransport(media.TransportPaused, 0, int64(msg.resp.Duration)*1000)
 		m.status = []string{"fetch complete"}
 		return m, func() tea.Msg {
@@ -182,7 +189,7 @@ func (m Model) submitPublishCmd(token string) tea.Cmd {
 	}
 }
 
-func (m Model) handleMouse(msg tea.MouseMsg) Model {
+func (m Model) handleMouse(msg tea.MouseMsg, isMotion bool) Model {
 	mouse := msg.Mouse()
 	x := mouse.X
 	y := mouse.Y
@@ -193,6 +200,25 @@ func (m Model) handleMouse(msg tea.MouseMsg) Model {
 		// Top row panels
 		if x < leftW {
 			m.focus = focusMedia
+			// Progress bar drag/click detection.
+			// Layout inside panel: border(1) + title(1) + track(1) + artist(1) + album(1) + spacing(1) + status(1) = row 7
+			progressBarAbsRow := media.ProgressBarRow + 1 // +1 for top border
+			if y == progressBarAbsRow {
+				if !isMotion {
+					// Direct click: seek immediately and start drag state
+					m.mediaDragging = true
+					innerX := x - 1     // subtract left border
+					innerW := leftW - 2 // subtract both borders
+					m = m.seekToMS(m.media.SeekForX(innerX, innerW))
+				} else if m.mediaDragging {
+					// Motion while drag is active: continue seeking
+					innerX := x - 1
+					innerW := leftW - 2
+					m = m.seekToMS(m.media.SeekForX(innerX, innerW))
+				}
+			} else if !isMotion {
+				m.mediaDragging = false
+			}
 		} else {
 			if m.focus != focusPublish {
 				m.focus = focusEditor
@@ -200,10 +226,12 @@ func (m Model) handleMouse(msg tea.MouseMsg) Model {
 			if mouse.Button == tea.MouseWheelUp || mouse.Button == tea.MouseWheelDown {
 				m.editor = m.editor.HandleMouseScroll(mouse.Button)
 			}
+			m.mediaDragging = false
 		}
 		m.waveform = m.waveform.WithHover(-1)
 	} else if y >= topHeight && y < availableHeight {
 		// Bottom row (Waveform)
+		m.mediaDragging = false
 		m.focus = focusWaveform
 		col := x - 1
 		width := m.width - 2
@@ -213,26 +241,38 @@ func (m Model) handleMouse(msg tea.MouseMsg) Model {
 			if mouse.Button == tea.MouseWheelUp || mouse.Button == tea.MouseWheelDown ||
 				mouse.Button == tea.MouseWheelLeft || mouse.Button == tea.MouseWheelRight {
 				m.waveform = m.waveform.HandleMouseLocal(col, mouse.Button, mouse.Mod)
-			} else if mouse.Button == tea.MouseLeft {
+			} else if mouse.Button == tea.MouseLeft && !isMotion {
 				newPos := m.waveform.SeekForColumn(col, width)
-				if m.player != nil {
-					pos, _ := playback.NewPosition(newPos)
-					snap, _ := m.player.Seek(pos)
-					state := media.TransportPaused
-					if snap.State == playback.StatePlaying {
-						state = media.TransportPlaying
-					}
-					m.media = m.media.WithTransport(state, snap.Position.Milliseconds(), snap.Duration.Milliseconds())
-					m.waveform = m.waveform.WithPosition(snap.Position.Milliseconds())
-					m.editor = m.editor.WithPlaybackPosition(snap.Position.Milliseconds())
-					m.status = []string{fmt.Sprintf("seek: %dms", snap.Position.Milliseconds())}
-				}
+				m = m.seekToMS(newPos)
+				m.status = []string{fmt.Sprintf("seek: %dms", newPos)}
 			}
 		} else {
 			m.waveform = m.waveform.WithHover(-1)
 		}
 	} else {
+		m.mediaDragging = false
 		m.waveform = m.waveform.WithHover(-1)
 	}
+	// Release always ends drag
+	if _, isRelease := msg.(tea.MouseReleaseMsg); isRelease {
+		m.mediaDragging = false
+	}
+	return m
+}
+
+// seekToMS seeks the player to the given millisecond position and updates all panels.
+func (m Model) seekToMS(newPosMS int64) Model {
+	if m.player == nil {
+		return m
+	}
+	pos, _ := playback.NewPosition(newPosMS)
+	snap, _ := m.player.Seek(pos)
+	state := media.TransportPaused
+	if snap.State == playback.StatePlaying {
+		state = media.TransportPlaying
+	}
+	m.media = m.media.WithTransport(state, snap.Position.Milliseconds(), snap.Duration.Milliseconds())
+	m.waveform = m.waveform.WithPosition(snap.Position.Milliseconds())
+	m.editor = m.editor.WithPlaybackPosition(snap.Position.Milliseconds())
 	return m
 }

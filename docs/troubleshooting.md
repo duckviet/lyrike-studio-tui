@@ -33,6 +33,8 @@ Draft storage reports corrupt JSON as a typed storage error. Move the bad draft 
 ${XDG_STATE_HOME:-$HOME/.local/state}/lyrike-studio-tui/drafts
 ```
 
+Draft filenames are project IDs. Use `--project <id>` or `Ctrl-P` in the TUI to select the project to save or reopen.
+
 ## Publish failure
 
 Publish failures leave the publish panel in a failed state with retry available. Retry requests a fresh proof-of-work step before publishing again. Backend publish HTTP failures are covered by backend client tests and should be treated as upstream/backend errors rather than local draft corruption.

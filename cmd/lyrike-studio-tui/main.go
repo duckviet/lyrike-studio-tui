@@ -31,6 +31,7 @@ func main() {
 	backendURL := flag.String("backend", "http://127.0.0.1:8000", "URL of the FastAPI backend")
 	mpvSocket := flag.String("mpv-socket", "/tmp/lyrike-mpv.sock", "Path to the mpv IPC socket")
 	videoID := flag.String("video-id", "", "YouTube video ID to sync")
+	projectID := flag.String("project", "", "project ID for draft save/load")
 	sourceURL := flag.String("url", "", "Source media URL to sync")
 	audioPath := flag.String("audio", "", "Path to the local audio file to play natively via beep")
 	importPath := flag.String("import", "", "Path to a lyric file (.lrc or .txt) to import at startup")
@@ -50,7 +51,7 @@ func main() {
 		return
 	}
 
-	if err := runReal(*backendURL, *mpvSocket, *videoID, *sourceURL, *audioPath, *importPath); err != nil {
+	if err := runReal(*backendURL, *mpvSocket, *videoID, *projectID, *sourceURL, *audioPath, *importPath); err != nil {
 		fmt.Fprintf(os.Stderr, "lyrike-studio-tui: error: %v\n", err)
 		os.Exit(1)
 	}
@@ -76,7 +77,7 @@ func runDemo(backendFixture bool) error {
 	return err
 }
 
-func runReal(backendURL, mpvSocket, videoID, sourceURL, audioPath, importPath string) error {
+func runReal(backendURL, mpvSocket, videoID, projectIDValue, sourceURL, audioPath, importPath string) error {
 	client := backend.NewClient(backendURL)
 
 	var player playback.Player
@@ -127,6 +128,19 @@ func runReal(backendURL, mpvSocket, videoID, sourceURL, audioPath, importPath st
 
 	// Try loading draft or imported lyrics
 	doc := defaultDocument()
+	store := storage.NewDefaultStore()
+	var projectID draft.ProjectID
+	if projectIDValue != "" {
+		id, err := draft.NewProjectID(projectIDValue)
+		if err != nil {
+			return err
+		}
+		projectID = id
+	} else if videoID != "" {
+		if id, err := draft.NewProjectID(videoID); err == nil {
+			projectID = id
+		}
+	}
 
 	if importPath != "" {
 		content, err := os.ReadFile(importPath)
@@ -141,21 +155,23 @@ func runReal(backendURL, mpvSocket, videoID, sourceURL, audioPath, importPath st
 			statusMsg += " | failed to read import file: " + err.Error()
 		}
 	} else {
-		// Try loading saved draft if videoID is set
-		store := storage.NewDefaultStore()
-		idStr := videoID
-		if idStr == "" {
-			idStr = "default"
-		}
-		if id, err := draft.NewDraftID(idStr); err == nil {
-			if snapshot, err := store.Load(id); err == nil {
+		if projectID != "" {
+			if snapshot, err := store.Load(projectID); err == nil {
 				doc = snapshot.Document
-				statusMsg += " | loaded saved draft for " + idStr
+				statusMsg += " | loaded project " + projectID.String()
 			}
 		}
 	}
 
-	model := tui.NewModel(doc, client, player, videoID, sourceURL)
+	model := tui.NewModelWithDraftStore(doc, client, player, store, projectID, videoID, sourceURL)
+	if projectID != "" {
+		if snapshot, err := store.Load(projectID); err == nil {
+			model = model.WithProjectMetadata(snapshot.Metadata.TrackName, snapshot.Metadata.ArtistName, snapshot.Metadata.AlbumName)
+		}
+	}
+	if projectID == "" && importPath == "" {
+		model = model.OpenProjectPickerOnStartup()
+	}
 	if statusMsg != "" {
 		model = model.WithStatus([]string{statusMsg})
 	}

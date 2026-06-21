@@ -21,7 +21,7 @@ func TestDraft_SaveAndLoad_roundTrip(t *testing.T) {
 		t.Fatalf("Save() error = %v, want nil", err)
 	}
 
-	got, err := store.Load(snapshot.ID)
+	got, err := store.Load(snapshot.ProjectID)
 	if err != nil {
 		t.Fatalf("Load() error = %v, want nil", err)
 	}
@@ -72,7 +72,7 @@ func TestDraft_Load_whenDraftMissing(t *testing.T) {
 		t.Fatalf("NewDraftID() error = %v", err)
 	}
 
-	_, err = store.Load(id)
+	_, err = store.Load(draft.ProjectID(id.String()))
 	if err == nil {
 		t.Fatalf("Load() error = nil, want not found")
 	}
@@ -99,7 +99,7 @@ func TestDraft_Load_whenCorrupt(t *testing.T) {
 		t.Fatalf("WriteFile() error = %v", err)
 	}
 
-	_, err = store.Load(id)
+	_, err = store.Load(draft.ProjectID(id.String()))
 	if err == nil {
 		t.Fatalf("Load() error = nil, want corrupt draft error")
 	}
@@ -133,7 +133,7 @@ func TestDraft_Save_ignoresStaleTempFile(t *testing.T) {
 	}
 
 	// Load must read the new atomic .json, not the stale .tmp.
-	got, err := store.Load(id)
+	got, err := store.Load(draft.ProjectID(id.String()))
 	if err != nil {
 		t.Fatalf("Load() error = %v, want nil", err)
 	}
@@ -153,7 +153,7 @@ func TestDraftStore_RoundTrip(t *testing.T) {
 		t.Fatalf("Save() error = %v", err)
 	}
 
-	got, err := store.Load(snapshot.ID)
+	got, err := store.Load(snapshot.ProjectID)
 	if err != nil {
 		t.Fatalf("Load() error = %v", err)
 	}
@@ -179,7 +179,7 @@ func TestDraft_List(t *testing.T) {
 		}
 	}
 
-	ids, err := store.List()
+	ids, err := store.ListProjects()
 	if err != nil {
 		t.Fatalf("List() error = %v", err)
 	}
@@ -197,11 +197,11 @@ func TestDraft_Delete(t *testing.T) {
 		t.Fatalf("Save() error = %v", err)
 	}
 
-	if err := store.Delete(snapshot.ID); err != nil {
+	if err := store.Delete(snapshot.ProjectID); err != nil {
 		t.Fatalf("Delete() error = %v", err)
 	}
 
-	_, err := store.Load(snapshot.ID)
+	_, err := store.Load(snapshot.ProjectID)
 	if err == nil {
 		t.Fatalf("Load() after Delete error = nil, want not found")
 	}
@@ -261,11 +261,13 @@ func newTestSnapshot(t *testing.T, videoID string) draft.Snapshot {
 	}
 
 	return draft.Snapshot{
-		ID: id,
+		ProjectID: draft.ProjectID(id.String()),
+		ID:        id,
 		Metadata: draft.Metadata{
 			VideoID:    videoID,
 			TrackName:  "Test Track",
 			ArtistName: "Test Artist",
+			AlbumName:  "Test Album",
 			Duration:   212,
 			UpdatedAt:  time.Date(2025, 1, 15, 8, 30, 0, 0, time.UTC),
 		},

@@ -9,6 +9,8 @@ const (
 	keyActionFocusNext
 	keyActionFocusPrev
 	keyActionSaveDraft
+	keyActionOpenProjects
+	keyActionEditMetadata
 	keyActionTogglePlayback
 	keyActionSeekBackward
 	keyActionSeekForward
@@ -24,6 +26,10 @@ func globalKeyAction(key tea.KeyPressMsg) keyAction {
 		return keyActionFocusNext
 	case key.Code == 's' && key.Mod == tea.ModCtrl:
 		return keyActionSaveDraft
+	case key.Code == 'p' && key.Mod == tea.ModCtrl:
+		return keyActionOpenProjects
+	case key.Code == 'e' && key.Mod == tea.ModCtrl:
+		return keyActionEditMetadata
 	default:
 		return keyActionNone
 	}

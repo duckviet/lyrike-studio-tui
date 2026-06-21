@@ -48,10 +48,18 @@ func renderLayout(m Model) string {
 	if m.width == 0 || m.height == 0 {
 		return "Loading..."
 	}
+	if m.picker.active() {
+		return renderProjectPicker(m.picker, m.width, m.height)
+	}
 
 	topHeight, wfHeight, leftW, rightW, _ := calculateLayout(m.width, m.height, len(m.status))
 
-	left := renderMediaPanel(m.media, leftW, topHeight, m.focus == focusMedia)
+	var left string
+	if m.metadataEditor.active {
+		left = renderMetadataEditor(m.metadataEditor, leftW, topHeight)
+	} else {
+		left = renderMediaPanel(m.media, leftW, topHeight, m.focus == focusMedia)
+	}
 
 	var right string
 	if m.focus == focusPublish {
@@ -71,7 +79,6 @@ func renderLayout(m Model) string {
 	}
 	return layout + "\n" + strings.Join(status, " | ")
 }
-
 
 func renderMediaPanel(p media.Panel, width, height int, focused bool) string {
 	style := normalBorder

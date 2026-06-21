@@ -22,7 +22,8 @@ func DemoModel() (Model, error) {
 	m := NewModel(doc, client, player, "", "")
 	m.trackName = "Demo Track"
 	m.artistName = "Demo Artist"
-	m.media = m.media.WithMetadata(m.trackName, m.artistName)
+	m.albumName = "Demo Album"
+	m.media = m.media.WithMetadata(m.trackName, m.artistName, m.albumName)
 
 	peaks := make([]float64, 120)
 	for i := range peaks {
@@ -47,7 +48,8 @@ func DemoFixtureModel(baseURL string) (Model, error) {
 	m := NewModel(doc, client, player, "", "")
 	m.trackName = "Demo Track (Fixture)"
 	m.artistName = "Demo Artist"
-	m.media = m.media.WithMetadata(m.trackName, m.artistName)
+	m.albumName = "Demo Album (Fixture)"
+	m.media = m.media.WithMetadata(m.trackName, m.artistName, m.albumName)
 
 	peaks := make([]float64, 120)
 	for i := range peaks {

@@ -8,7 +8,6 @@ import (
 
 	"github.com/duckviet/lyrike-studio-tui/internal/domain/draft"
 	"github.com/duckviet/lyrike-studio-tui/internal/playback"
-	"github.com/duckviet/lyrike-studio-tui/internal/storage"
 	"github.com/duckviet/lyrike-studio-tui/internal/tui/publish"
 )
 
@@ -38,6 +37,10 @@ func (m Model) applyRootKeyAction(action keyAction) (tea.Model, tea.Cmd) {
 		m.focus = m.prevFocus()
 	case keyActionSaveDraft:
 		m = m.saveDraft()
+	case keyActionOpenProjects:
+		m = m.openProjectPicker()
+	case keyActionEditMetadata:
+		m = m.openMetadataEditor()
 	case keyActionTogglePlayback:
 		m = m.togglePlayback()
 	case keyActionSeekBackward:
@@ -62,9 +65,13 @@ func (m Model) updateFocusedPanel(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		m.waveform = m.waveform.WithWidth(m.width - 2)
 		m.waveform, cmd = m.waveform.Update(msg)
 	case focusEditor:
+		before := m.editor.Document
 		snap := m.player.Snapshot()
 		m.editor = m.editor.WithTapPosition(snap.Position)
 		m.editor, cmd = m.editor.Update(msg)
+		if fmt.Sprint(before) != fmt.Sprint(m.editor.Document) {
+			m.dirty = true
+		}
 		if msg.Code == 't' {
 			m.status = []string{"tap-sync applied"}
 		}
@@ -108,13 +115,12 @@ func (m Model) seekPlayback(deltaMS int64) Model {
 }
 
 func (m Model) saveDraft() Model {
-	store := storage.NewDefaultStore()
-	doc := m.editor.Document
-	idStr := m.videoID
-	if idStr == "" {
-		idStr = "default"
+	if m.projectID == "" {
+		m.picker = projectPicker{mode: projectPickerCreate}
+		m.status = []string{"project id required before save"}
+		return m
 	}
-	id, _ := draft.NewDraftID(idStr)
+	doc := m.editor.Document
 
 	track := m.trackName
 	if track == "" {
@@ -124,25 +130,32 @@ func (m Model) saveDraft() Model {
 	if artist == "" {
 		artist = "Unknown Artist"
 	}
+	album := m.albumName
+	if album == "" {
+		album = "Unknown Album"
+	}
 
 	durationSeconds := 0
 	if m.player != nil {
 		durationSeconds = int(m.player.Snapshot().Duration.Milliseconds() / 1000)
 	}
 	snap := draft.Snapshot{
-		ID: id,
+		ProjectID: m.projectID,
+		ID:        draft.DraftID(m.projectID.String()),
 		Metadata: draft.Metadata{
 			VideoID:    m.videoID,
 			TrackName:  track,
 			ArtistName: artist,
+			AlbumName:  album,
 			Duration:   durationSeconds,
 			UpdatedAt:  time.Now(),
 		},
 		Document: doc,
 	}
-	err := store.Save(snap)
+	err := m.draftStore.Save(snap)
 	if err == nil {
-		m.status = []string{"draft save complete"}
+		m.dirty = false
+		m.status = []string{"project saved: " + m.projectID.String()}
 	} else {
 		m.status = []string{"draft save failed: " + err.Error()}
 	}
@@ -173,4 +186,12 @@ func (m Model) prevFocus() focus {
 	default:
 		return focusEditor
 	}
+}
+
+func (m Model) WithProjectMetadata(track, artist, album string) Model {
+	m.trackName = track
+	m.artistName = artist
+	m.albumName = album
+	m.media = m.media.WithMetadata(track, artist, album)
+	return m
 }

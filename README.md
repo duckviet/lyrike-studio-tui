@@ -10,6 +10,7 @@ From this repository root:
 go run ./cmd/lyrike-studio-tui --version
 go run ./cmd/lyrike-studio-tui --demo
 go run ./cmd/lyrike-studio-tui --demo --backend-fixture
+go run ./cmd/lyrike-studio-tui --project my-song
 ```
 
 The fixture demo is the current end-to-end QA harness. It renders deterministic backend and playback milestones: fetch, playback, tap-sync, draft save, publish success, and quit readiness.

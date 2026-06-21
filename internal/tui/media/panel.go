@@ -23,6 +23,7 @@ type Panel struct {
 	durationMS int64
 	trackName  string
 	artistName string
+	albumName  string
 }
 
 func NewPanel() Panel {
@@ -40,10 +41,43 @@ func (p Panel) WithTransport(state TransportState, positionMS int64, durationMS 
 	return p
 }
 
-func (p Panel) WithMetadata(track, artist string) Panel {
+func (p Panel) WithMetadata(track, artist, album string) Panel {
 	p.trackName = track
 	p.artistName = artist
+	p.albumName = album
 	return p
+}
+
+// ProgressBarRow returns the 0-based row index of the progress bar within the
+// panel's content area (excluding the border). The caller adds the border offset.
+// Layout (each item = 1 row): Title, Track, Artist, Album, Spacing, Status, ProgressBar
+// Index inside the View() string:  0=Track,1=Artist,2=Album,3="",4=Status,5=ProgressBar
+// In renderMediaPanel rows[0]=Title, rows[1]=View content starting at Track.
+// So progress bar is at row index 1 (title) + 5 (lines before bar in View) + 1 (border top) = 7.
+const ProgressBarRow = 7 // absolute row inside panel border
+
+// SeekForX converts an X position (0-based, within the panel inner content)
+// to a playback position in milliseconds.
+func (p Panel) SeekForX(x, contentWidth int) int64 {
+	if contentWidth <= 1 || p.durationMS <= 0 {
+		return 0
+	}
+	// The progress bar layout: "HH:MM.SS " (startLabel + space) ... bar ... " HH:MM.SS"
+	startLabel := formatMillis(p.positionMS)
+	endLabel := formatMillis(p.durationMS)
+	labelOffset := len(startLabel) + 1 // startLabel + one space
+	barWidth := contentWidth - len(startLabel) - len(endLabel) - 2
+	if barWidth < 1 {
+		return 0
+	}
+	barX := x - labelOffset
+	if barX < 0 {
+		barX = 0
+	}
+	if barX > barWidth {
+		barX = barWidth
+	}
+	return p.durationMS * int64(barX) / int64(barWidth)
 }
 
 func (p Panel) Update(_ tea.Msg) (Panel, tea.Cmd) {
@@ -68,9 +102,14 @@ func (p Panel) View(width int, height int) string {
 	if artist == "" {
 		artist = "Unknown Artist"
 	}
+	album := p.albumName
+	if album == "" {
+		album = "Unknown Album"
+	}
 
 	trackStyle := lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("#7D56F4"))
 	artistStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#888888"))
+	albumStyle := lipgloss.NewStyle().Italic(true).Foreground(lipgloss.Color("#666666"))
 
 	stateStr := "Paused"
 	if p.state == TransportPlaying {
@@ -91,6 +130,7 @@ func (p Panel) View(width int, height int) string {
 	var lines []string
 	lines = append(lines, trackStyle.Render(track))
 	lines = append(lines, artistStyle.Render(artist))
+	lines = append(lines, albumStyle.Render(album))
 	lines = append(lines, "") // spacing
 	lines = append(lines, statusLine)
 	lines = append(lines, p.progressBar(width))

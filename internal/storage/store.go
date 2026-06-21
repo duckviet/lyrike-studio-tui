@@ -15,9 +15,9 @@ import (
 // Store persists draft snapshots.
 type Store interface {
 	Save(snapshot draft.Snapshot) error
-	Load(id draft.DraftID) (draft.Snapshot, error)
-	List() ([]draft.DraftID, error)
-	Delete(id draft.DraftID) error
+	Load(id draft.ProjectID) (draft.Snapshot, error)
+	ListProjects() ([]draft.ProjectSummary, error)
+	Delete(id draft.ProjectID) error
 }
 
 // FileStore is a filesystem-backed Store that writes drafts atomically.
@@ -34,20 +34,25 @@ func NewFileStore(dir string) *FileStore {
 
 // Save writes snapshot atomically using a temp file + rename + fsync.
 func (s *FileStore) Save(snapshot draft.Snapshot) error {
-	if snapshot.ID == "" {
+	projectID, err := snapshotProjectID(snapshot)
+	if err != nil {
 		return &StorageError{
 			Code: CodeInvalidDraftID,
 			Op:   "save",
-			Err:  draft.ErrInvalidDraftID,
+			Err:  err,
 		}
 	}
 
+	snapshot.ProjectID = projectID
+	if snapshot.ID == "" {
+		snapshot.ID = draft.DraftID(projectID.String())
+	}
 	stored := toStored(snapshot)
 	data, err := json.Marshal(stored)
 	if err != nil {
 		return &StorageError{
 			Code:    CodeDraftWriteFailed,
-			DraftID: snapshot.ID.String(),
+			DraftID: projectID.String(),
 			Op:      "save",
 			Err:     fmt.Errorf("marshal: %w", err),
 		}
@@ -56,19 +61,19 @@ func (s *FileStore) Save(snapshot draft.Snapshot) error {
 	if err := os.MkdirAll(s.dir, 0o700); err != nil {
 		return &StorageError{
 			Code:    CodeDraftWriteFailed,
-			DraftID: snapshot.ID.String(),
+			DraftID: projectID.String(),
 			Op:      "save",
 			Err:     fmt.Errorf("mkdir: %w", err),
 		}
 	}
 
-	finalPath := s.path(snapshot.ID)
+	finalPath := s.path(projectID)
 	tmpPath := finalPath + ".tmp"
 
 	if err := writeFileAtomic(tmpPath, data); err != nil {
 		return &StorageError{
 			Code:    CodeDraftWriteFailed,
-			DraftID: snapshot.ID.String(),
+			DraftID: projectID.String(),
 			Op:      "save",
 			Err:     fmt.Errorf("write temp: %w", err),
 		}
@@ -78,7 +83,7 @@ func (s *FileStore) Save(snapshot draft.Snapshot) error {
 		_ = os.Remove(tmpPath)
 		return &StorageError{
 			Code:    CodeDraftWriteFailed,
-			DraftID: snapshot.ID.String(),
+			DraftID: projectID.String(),
 			Op:      "save",
 			Err:     fmt.Errorf("rename: %w", err),
 		}
@@ -91,12 +96,12 @@ func (s *FileStore) Save(snapshot draft.Snapshot) error {
 }
 
 // Load reads and parses the draft identified by id.
-func (s *FileStore) Load(id draft.DraftID) (draft.Snapshot, error) {
+func (s *FileStore) Load(id draft.ProjectID) (draft.Snapshot, error) {
 	if id == "" {
 		return draft.Snapshot{}, &StorageError{
 			Code: CodeInvalidDraftID,
 			Op:   "load",
-			Err:  draft.ErrInvalidDraftID,
+			Err:  draft.ErrInvalidProjectID,
 		}
 	}
 
@@ -142,7 +147,7 @@ func (s *FileStore) Load(id draft.DraftID) (draft.Snapshot, error) {
 }
 
 // List returns all draft IDs persisted in the store, sorted lexically.
-func (s *FileStore) List() ([]draft.DraftID, error) {
+func (s *FileStore) ListProjects() ([]draft.ProjectSummary, error) {
 	entries, err := os.ReadDir(s.dir)
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
@@ -155,7 +160,7 @@ func (s *FileStore) List() ([]draft.DraftID, error) {
 		}
 	}
 
-	var ids []draft.DraftID
+	var summaries []draft.ProjectSummary
 	for _, entry := range entries {
 		if entry.IsDir() {
 			continue
@@ -164,26 +169,38 @@ func (s *FileStore) List() ([]draft.DraftID, error) {
 		if !strings.HasSuffix(name, ".json") {
 			continue
 		}
-		id, err := draft.NewDraftID(strings.TrimSuffix(name, ".json"))
+		id, err := draft.NewProjectID(strings.TrimSuffix(name, ".json"))
 		if err != nil {
 			continue
 		}
-		ids = append(ids, id)
+		snapshot, err := s.Load(id)
+		if err != nil {
+			return nil, err
+		}
+		summaries = append(summaries, draft.ProjectSummary{
+			ID:       id,
+			Metadata: snapshot.Metadata,
+		})
 	}
 
-	sort.Slice(ids, func(i, j int) bool {
-		return ids[i] < ids[j]
+	sort.Slice(summaries, func(i, j int) bool {
+		left := summaries[i]
+		right := summaries[j]
+		if !left.Metadata.UpdatedAt.Equal(right.Metadata.UpdatedAt) {
+			return left.Metadata.UpdatedAt.After(right.Metadata.UpdatedAt)
+		}
+		return left.ID.String() < right.ID.String()
 	})
-	return ids, nil
+	return summaries, nil
 }
 
 // Delete removes the draft identified by id.
-func (s *FileStore) Delete(id draft.DraftID) error {
+func (s *FileStore) Delete(id draft.ProjectID) error {
 	if id == "" {
 		return &StorageError{
 			Code: CodeInvalidDraftID,
 			Op:   "delete",
-			Err:  draft.ErrInvalidDraftID,
+			Err:  draft.ErrInvalidProjectID,
 		}
 	}
 
@@ -207,8 +224,19 @@ func (s *FileStore) Delete(id draft.DraftID) error {
 	return nil
 }
 
-func (s *FileStore) path(id draft.DraftID) string {
+func (s *FileStore) path(id draft.ProjectID) string {
 	return filepath.Join(s.dir, id.String()+".json")
 }
 
-
+func snapshotProjectID(snapshot draft.Snapshot) (draft.ProjectID, error) {
+	if snapshot.ProjectID != "" {
+		return snapshot.ProjectID, nil
+	}
+	if snapshot.ID != "" {
+		return draft.NewProjectID(snapshot.ID.String())
+	}
+	if snapshot.Metadata.VideoID != "" {
+		return draft.NewProjectID(snapshot.Metadata.VideoID)
+	}
+	return "", draft.ErrInvalidProjectID
+}

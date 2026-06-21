@@ -65,7 +65,9 @@ var helpLines = []string{
 	"  Ctrl-, / Ctrl-. : Fine nudge End time ±10ms",
 	"",
 	"Commands & File:",
-	"  Ctrl-S          : Save draft snapshot",
+	"  Ctrl-S          : Save project draft",
+	"  Ctrl-P          : Open project picker",
+	"  Ctrl-E          : Edit project metadata (name / artist / album)",
 	"  I               : Import lyrics from file",
 	"  p               : Publish lyrics to server",
 	"  h / ?           : Toggle help menu",
@@ -160,7 +162,7 @@ func (p Panel) View(_ int, height int) string {
 
 		if p.lastErr != nil {
 			errStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#FF3366"))
-			builder.WriteString(errStyle.Render("Error: " + p.lastErr.Error()) + "\n\n")
+			builder.WriteString(errStyle.Render("Error: "+p.lastErr.Error()) + "\n\n")
 		}
 
 		builder.WriteString("(Press Enter to import, Esc to cancel)")

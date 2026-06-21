@@ -6,9 +6,11 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 
+	"github.com/duckviet/lyrike-studio-tui/internal/domain/draft"
 	"github.com/duckviet/lyrike-studio-tui/internal/domain/lyrics"
 	"github.com/duckviet/lyrike-studio-tui/internal/integrations/backend"
 	"github.com/duckviet/lyrike-studio-tui/internal/playback"
+	"github.com/duckviet/lyrike-studio-tui/internal/storage"
 	"github.com/duckviet/lyrike-studio-tui/internal/tui/editor"
 	"github.com/duckviet/lyrike-studio-tui/internal/tui/media"
 	"github.com/duckviet/lyrike-studio-tui/internal/tui/publish"
@@ -27,35 +29,50 @@ const (
 
 // Model is the root Bubble Tea model for the three-panel shell.
 type Model struct {
-	width      int
-	height     int
-	focus      focus
-	media      media.Panel
-	waveform   waveform.Panel
-	editor     editor.Panel
-	publish    publish.Panel
-	status     []string
+	width    int
+	height   int
+	focus    focus
+	media    media.Panel
+	waveform waveform.Panel
+	editor   editor.Panel
+	publish  publish.Panel
+	status   []string
+	picker   projectPicker
+	dirty    bool
+
+	mediaDragging  bool
 
 	client     *backend.Client
 	player     playback.Player
-	videoID    string
-	sourceURL  string
-	trackName  string
-	artistName string
+	draftStore     storage.Store
+	projectID      draft.ProjectID
+	videoID        string
+	sourceURL      string
+	trackName      string
+	artistName     string
+	albumName      string
+	metadataEditor metadataEditor
 }
 
 // NewModel builds a shell model with the given panels.
 func NewModel(doc lyrics.Document, client *backend.Client, player playback.Player, videoID string, sourceURL string) Model {
+	projectID, _ := draft.NewProjectID(videoID)
+	return NewModelWithDraftStore(doc, client, player, storage.NewDefaultStore(), projectID, videoID, sourceURL)
+}
+
+func NewModelWithDraftStore(doc lyrics.Document, client *backend.Client, player playback.Player, store storage.Store, projectID draft.ProjectID, videoID string, sourceURL string) Model {
 	return Model{
-		focus:     focusMedia,
-		media:     media.NewPanel(),
-		waveform:  waveform.NewPanel(),
-		editor:    editor.NewPanel(doc),
-		publish:   publish.NewPanel(),
-		client:    client,
-		player:    player,
-		videoID:   videoID,
-		sourceURL: sourceURL,
+		focus:      focusMedia,
+		media:      media.NewPanel(),
+		waveform:   waveform.NewPanel(),
+		editor:     editor.NewPanel(doc),
+		publish:    publish.NewPanel(),
+		client:     client,
+		player:     player,
+		draftStore: store,
+		projectID:  projectID,
+		videoID:    videoID,
+		sourceURL:  sourceURL,
 	}
 }
 
