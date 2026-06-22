@@ -20,3 +20,5 @@ coverage.out
 # Built binary at repo root
 /lyrike-studio-tui
 
+.env
+

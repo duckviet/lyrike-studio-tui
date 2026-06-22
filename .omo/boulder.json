@@ -1,6 +1,6 @@
 {
   "schema_version": 2,
-  "active_work_id": "go-backend-ulw",
+  "active_work_id": "tui-fetch-input-ulw",
   "works": {
     "lyrike-studio-tui-ulw": {
       "work_id": "lyrike-studio-tui-ulw",
@@ -15,7 +15,15 @@
       "active_plan": ".omo/plans/go-backend.md",
       "plan_name": "go-backend",
       "session_ids": ["codex:go-backend-impl"],
-      "status": "active",
+      "status": "completed",
+      "worktree_path": null
+    },
+    "tui-fetch-input-ulw": {
+      "work_id": "tui-fetch-input-ulw",
+      "active_plan": ".omo/plans/tui-fetch-input.md",
+      "plan_name": "tui-fetch-input",
+      "session_ids": ["codex:tui-fetch-input-impl"],
+      "status": "completed",
       "worktree_path": null
     }
   }

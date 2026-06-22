@@ -62,6 +62,10 @@ go run ./cmd/lyrike-studio-tui serve --port 8080 --cache-dir ./data
 go run ./cmd/lyrike-studio-tui --backend http://127.0.0.1:8080 --video-id <youtube-id>
 ```
 
+You can also start the TUI without `--video-id` and press `Ctrl-O` to open the
+fetch modal, then paste a YouTube URL or video ID (for example
+`https://www.youtube.com/watch?v=P0N0h_EOS-c`) and press Enter.
+
 The TUI plays audio natively through beep using the backend's
 `/local-api/audio/{id}` URL. If no audio is available it falls back to a fake
 player so the editor still works.

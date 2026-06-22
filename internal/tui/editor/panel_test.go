@@ -270,3 +270,43 @@ func TestLyricsScrolling(t *testing.T) {
 		t.Fatalf("expected scrollOffset to be 1 after mouse scroll down, got %d", panel.viewport.YOffset)
 	}
 }
+
+func TestLyricsKeyboardEditPaste(t *testing.T) {
+	t.Parallel()
+
+	panel := NewPanel(testDocument(t))
+
+	// Enter editing mode
+	panel, _ = panel.Update(tea.KeyPressMsg{Code: 'e'})
+
+	// Send Backspace 10 times to clear "First line"
+	for i := 0; i < 10; i++ {
+		panel, _ = panel.Update(tea.KeyPressMsg{Code: tea.KeyBackspace})
+	}
+
+	// Paste text
+	panel, _ = panel.Update(tea.PasteMsg{Content: "Pasted text"})
+
+	// Press Enter to submit
+	updated, _ := panel.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
+
+	if got := updated.Document.Lines()[0].Text().String(); got != "Pasted text" {
+		t.Fatalf("edited line text = %q, want Pasted text", got)
+	}
+}
+
+func TestLyricsKeyboardImportPaste(t *testing.T) {
+	t.Parallel()
+
+	panel := NewPanel(testDocument(t))
+
+	// Enter importing mode
+	panel, _ = panel.Update(tea.KeyPressMsg{Code: 'I'})
+
+	// Paste text
+	panel, _ = panel.Update(tea.PasteMsg{Content: "ImportedPath/file.txt"})
+
+	if panel.InputText != "ImportedPath/file.txt" {
+		t.Fatalf("expected InputText to be 'ImportedPath/file.txt', got %q", panel.InputText)
+	}
+}

@@ -31,6 +31,7 @@ var helpLines = []string{
 	"",
 	"Commands & File:",
 	"  Ctrl-S          : Save project draft",
+	"  Ctrl-O          : Fetch media from URL",
 	"  Ctrl-P          : Open project picker",
 	"  Ctrl-E          : Edit project metadata (name / artist / album)",
 	"  I               : Import lyrics from file",

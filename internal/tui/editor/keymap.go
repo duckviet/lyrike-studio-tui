@@ -306,6 +306,24 @@ func (p Panel) handleKey(key tea.KeyPressMsg) (Panel, tea.Cmd) {
 	return p, nil
 }
 
+func (p Panel) handlePaste(paste tea.PasteMsg) (Panel, tea.Cmd) {
+	if p.ShowHelp {
+		return p, nil
+	}
+	if p.Importing || p.Editing {
+		content := paste.Content
+		content = strings.ReplaceAll(content, "\r\n", " ")
+		content = strings.ReplaceAll(content, "\n", " ")
+
+		runes := []rune(p.InputText)
+		insertRunes := []rune(content)
+		runes = append(runes[:p.cursorPos], append(insertRunes, runes[p.cursorPos:]...)...)
+		p.InputText = string(runes)
+		p.cursorPos += len(insertRunes)
+	}
+	return p, nil
+}
+
 func normalizeKeyPress(key tea.KeyPressMsg) tea.KeyPressMsg {
 	if key.Code == 0 && key.Mod == 0 {
 		runes := []rune(key.Text)

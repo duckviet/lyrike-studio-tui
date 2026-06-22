@@ -39,6 +39,8 @@ func (m Model) applyRootKeyAction(action keyAction) (tea.Model, tea.Cmd) {
 		m = m.saveDraft()
 	case keyActionOpenProjects:
 		m = m.openProjectPicker()
+	case keyActionOpenFetch:
+		m = m.openFetchInput()
 	case keyActionEditMetadata:
 		m = m.openMetadataEditor()
 	case keyActionTogglePlayback:
@@ -56,7 +58,7 @@ func (m Model) applyRootKeyAction(action keyAction) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-func (m Model) updateFocusedPanel(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
+func (m Model) updateFocusedPanel(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmd tea.Cmd
 	switch m.focus {
 	case focusMedia:
@@ -72,13 +74,15 @@ func (m Model) updateFocusedPanel(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		if fmt.Sprint(before) != fmt.Sprint(m.editor.Document) {
 			m.dirty = true
 		}
-		if msg.Code == 't' {
+		if key, ok := msg.(tea.KeyPressMsg); ok && key.Code == 't' {
 			m.status = []string{"tap-sync applied"}
 		}
 	case focusPublish:
-		if msg.Code == tea.KeyEscape || (m.publish.State() == publish.StateDone && msg.Code == tea.KeyEnter) {
-			m.focus = focusEditor
-			return m, nil
+		if key, ok := msg.(tea.KeyPressMsg); ok {
+			if key.Code == tea.KeyEscape || (m.publish.State() == publish.StateDone && key.Code == tea.KeyEnter) {
+				m.focus = focusEditor
+				return m, nil
+			}
 		}
 		m.publish, cmd = m.publish.Update(msg)
 	}
@@ -116,8 +120,8 @@ func (m Model) seekPlayback(deltaMS int64) Model {
 
 func (m Model) saveDraft() Model {
 	if m.projectID == "" {
-		m.picker = projectPicker{mode: projectPickerCreate}
-		m.status = []string{"project id required before save"}
+		m = m.openFetchInput()
+		m.status = []string{"fetch a video before saving"}
 		return m
 	}
 	doc := m.editor.Document

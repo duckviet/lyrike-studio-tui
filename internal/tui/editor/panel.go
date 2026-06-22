@@ -65,11 +65,13 @@ func (p Panel) activeLineIndex() int {
 }
 
 func (p Panel) Update(msg tea.Msg) (Panel, tea.Cmd) {
-	key, ok := msg.(tea.KeyPressMsg)
-	if !ok {
-		return p, nil
+	switch msg := msg.(type) {
+	case tea.PasteMsg:
+		return p.handlePaste(msg)
+	case tea.KeyPressMsg:
+		return p.handleKey(msg)
 	}
-	return p.handleKey(key)
+	return p, nil
 }
 
 type StartPublishMsg struct {

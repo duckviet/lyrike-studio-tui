@@ -120,9 +120,9 @@ func TestBuildFetchArgs(t *testing.T) {
 		requiredFlags := []string{
 			"--quiet",
 			"--no-warnings",
-			"--noplaylist",
+			"--no-playlist",
 			"--skip-download",
-			"--nocheckcertificate",
+			"--no-check-certificate",
 			"--dump-json",
 		}
 		for _, f := range requiredFlags {
@@ -211,8 +211,8 @@ func TestBuildDownloadArgs(t *testing.T) {
 		t.Errorf("expected --format bestaudio[ext=m4a]/bestaudio/best, got %q (ok=%v)", val, ok)
 	}
 	wantOutTmpl := filepath.Join(dir, "audio", videoID, "original.%(ext)s")
-	if val, ok := argValue(got, "--outtmpl"); !ok || val != wantOutTmpl {
-		t.Errorf("expected --outtmpl %q, got %q (ok=%v)", wantOutTmpl, val, ok)
+	if val, ok := argValue(got, "--output"); !ok || val != wantOutTmpl {
+		t.Errorf("expected --output %q, got %q (ok=%v)", wantOutTmpl, val, ok)
 	}
 
 	extractorArgs := argValues(got, "--extractor-args")

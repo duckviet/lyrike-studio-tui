@@ -7,6 +7,7 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 
+	"github.com/duckviet/lyrike-studio-tui/internal/domain/draft"
 	"github.com/duckviet/lyrike-studio-tui/internal/domain/lyrics"
 	"github.com/duckviet/lyrike-studio-tui/internal/integrations/backend"
 	"github.com/duckviet/lyrike-studio-tui/internal/playback"
@@ -28,6 +29,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case tea.KeyPressMsg:
+		if m.fetchInput.active() {
+			return m.updateFetchInput(msg)
+		}
 		if m.picker.active() {
 			return m.updateProjectPicker(msg)
 		}
@@ -35,6 +39,15 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m.updateMetadataEditor(msg)
 		}
 		return m.updateKey(msg)
+
+	case tea.PasteMsg:
+		if m.fetchInput.active() {
+			return m.updateFetchInput(msg)
+		}
+		if m.metadataEditor.active {
+			return m.updateMetadataEditor(msg)
+		}
+		return m.updateFocusedPanel(msg)
 
 	case tea.MouseMsg:
 		_, isMotion := msg.(tea.MouseMotionMsg)
@@ -47,6 +60,12 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 		m.videoID = msg.resp.VideoID
+		if m.projectID == "" {
+			m.projectID, _ = draft.NewProjectID(msg.resp.VideoID)
+		}
+		if msg.resp.SourceURL != nil {
+			m.sourceURL = *msg.resp.SourceURL
+		}
 		m.trackName = msg.resp.TrackName
 		m.artistName = msg.resp.ArtistName
 		if fp, ok := m.player.(*playback.FakePlayer); ok {

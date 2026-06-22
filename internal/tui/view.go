@@ -48,6 +48,9 @@ func renderLayout(m Model) string {
 	if m.width == 0 || m.height == 0 {
 		return "Loading..."
 	}
+	if m.fetchInput.active() {
+		return renderFetchInput(m.fetchInput, m.width, m.height)
+	}
 	if m.picker.active() {
 		return renderProjectPicker(m.picker, m.width, m.height)
 	}

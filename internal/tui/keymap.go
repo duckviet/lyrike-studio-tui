@@ -15,6 +15,7 @@ const (
 	keyActionSeekBackward
 	keyActionSeekForward
 	keyActionToggleFollow
+	keyActionOpenFetch
 	keyActionQuit
 )
 
@@ -30,6 +31,8 @@ func globalKeyAction(key tea.KeyPressMsg) keyAction {
 		return keyActionOpenProjects
 	case key.Code == 'e' && key.Mod == tea.ModCtrl:
 		return keyActionEditMetadata
+	case key.Code == 'o' && key.Mod == tea.ModCtrl:
+		return keyActionOpenFetch
 	default:
 		return keyActionNone
 	}

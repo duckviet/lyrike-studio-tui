@@ -180,18 +180,26 @@ func (s *Server) fetch(w http.ResponseWriter, r *http.Request) {
 	}
 
 	_, audioReady := s.findCachedAudio(s.cfg.CacheDir, videoID)
-	if !audioReady && urlStr != "" {
-		_, err := s.downloadAudio(r.Context(), urlStr, videoID, s.cfg.CacheDir)
-		if err != nil {
-			var yte *ytdlp.YtdlpError
-			if errors.As(err, &yte) {
-				writeError(w, yte.StatusCode, "download_failed", yte.Message)
+	if !audioReady {
+		downloadURL := urlStr
+		if downloadURL == "" {
+			if sVal, ok := meta["sourceUrl"].(string); ok {
+				downloadURL = sVal
+			}
+		}
+		if downloadURL != "" {
+			_, err := s.downloadAudio(r.Context(), downloadURL, videoID, s.cfg.CacheDir)
+			if err != nil {
+				var yte *ytdlp.YtdlpError
+				if errors.As(err, &yte) {
+					writeError(w, yte.StatusCode, "download_failed", yte.Message)
+					return
+				}
+				writeError(w, http.StatusBadGateway, "download_failed", err.Error())
 				return
 			}
-			writeError(w, http.StatusBadGateway, "download_failed", err.Error())
-			return
+			audioReady = true
 		}
-		audioReady = true
 	}
 
 	resp := backend.FetchResponse{

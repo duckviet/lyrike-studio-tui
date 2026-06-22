@@ -1,11 +1,14 @@
 package tui
 
 import (
+	"os"
+	"strings"
 	"testing"
 
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/duckviet/lyrike-studio-tui/internal/domain/draft"
+	"github.com/duckviet/lyrike-studio-tui/internal/storage"
 )
 
 type memoryDraftStore struct {
@@ -22,7 +25,10 @@ func (s *memoryDraftStore) Save(snapshot draft.Snapshot) error {
 }
 
 func (s *memoryDraftStore) Load(id draft.ProjectID) (draft.Snapshot, error) {
-	return s.loads[id], nil
+	if snap, ok := s.loads[id]; ok {
+		return snap, nil
+	}
+	return draft.Snapshot{}, &storage.StorageError{Code: storage.CodeDraftNotFound, Op: "load", Err: os.ErrNotExist}
 }
 
 func (s *memoryDraftStore) ListProjects() ([]draft.ProjectSummary, error) {
@@ -53,15 +59,18 @@ func TestProjectSave_usesInjectedStoreAndProjectID(t *testing.T) {
 	}
 }
 
-func TestProjectSave_withoutProjectOpensCreatePicker(t *testing.T) {
+func TestProjectSave_withoutProjectOpensFetchInput(t *testing.T) {
 	store := &memoryDraftStore{}
 	model := NewModelWithDraftStore(mustDemoDocument(t), nil, nil, store, "", "", "")
 
 	next, _ := model.Update(tea.KeyPressMsg{Code: 's', Mod: tea.ModCtrl})
 	got := next.(Model)
 
-	if got.picker.mode != projectPickerCreate {
-		t.Fatalf("picker mode = %d, want create", got.picker.mode)
+	if !got.fetchInput.active() {
+		t.Fatalf("fetchInput.active = false, want true")
+	}
+	if got.picker.active() {
+		t.Fatalf("picker.active = true, want false")
 	}
 	if store.saves != 0 {
 		t.Fatalf("Save calls = %d, want 0", store.saves)
@@ -118,5 +127,32 @@ func TestProjectPicker_loadRequiresConfirmationWhenDirty(t *testing.T) {
 	}
 	if got.dirty {
 		t.Fatalf("dirty = true, want false after load")
+	}
+}
+
+func TestProjectPickerNOpensFetchInput(t *testing.T) {
+	store := &memoryDraftStore{
+		projects: []draft.ProjectSummary{{ID: "project-a"}},
+	}
+	model := NewModelWithDraftStore(mustDemoDocument(t), nil, nil, store, "", "", "").openProjectPicker()
+
+	next, _ := model.Update(tea.KeyPressMsg{Code: 'n'})
+	got := next.(Model)
+
+	if !got.fetchInput.active() {
+		t.Fatalf("fetchInput.active = false, want true")
+	}
+	if got.picker.active() {
+		t.Fatalf("picker.active = true, want false")
+	}
+}
+
+func TestProjectPickerNoProjectsShowsNewFromURL(t *testing.T) {
+	store := &memoryDraftStore{}
+	model := NewModelWithDraftStore(mustDemoDocument(t), nil, nil, store, "", "", "").openProjectPicker()
+
+	out := renderProjectPicker(model.picker, 80, 24)
+	if !strings.Contains(out, "new from URL") {
+		t.Fatalf("render missing 'new from URL': %q", out)
 	}
 }

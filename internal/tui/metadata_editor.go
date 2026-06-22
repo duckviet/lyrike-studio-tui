@@ -27,71 +27,89 @@ func (m Model) openMetadataEditor() Model {
 	return m
 }
 
-func (m Model) updateMetadataEditor(msg tea.KeyPressMsg) (Model, tea.Cmd) {
-	msg = normalizeKeyPress(msg)
+func (m Model) updateMetadataEditor(msg tea.Msg) (Model, tea.Cmd) {
 	me := m.metadataEditor
 
-	switch {
-	case msg.Code == tea.KeyEscape:
-		m.metadataEditor = metadataEditor{}
-		m.status = []string{"metadata editing canceled"}
-		return m, nil
-
-	case msg.Code == tea.KeyTab && msg.Mod != tea.ModShift, msg.Code == tea.KeyDown:
-		me.focus = (me.focus + 1) % 3
-		m.metadataEditor = me
-		return m, nil
-
-	case (msg.Code == tea.KeyTab && msg.Mod == tea.ModShift), msg.Code == tea.KeyUp:
-		me.focus = (me.focus - 1 + 3) % 3
-		m.metadataEditor = me
-		return m, nil
-
-	case msg.Code == tea.KeyEnter:
-		m.trackName = strings.TrimSpace(me.trackName)
-		m.artistName = strings.TrimSpace(me.artistName)
-		m.albumName = strings.TrimSpace(me.albumName)
-		m.media = m.media.WithMetadata(m.trackName, m.artistName, m.albumName)
-		m.metadataEditor = metadataEditor{}
-		m.dirty = true
-		m.status = []string{"metadata updated"}
-		return m, nil
-
-	case msg.Code == tea.KeyBackspace:
-		switch me.focus {
-		case 0:
-			if len(me.trackName) > 0 {
-				runes := []rune(me.trackName)
-				me.trackName = string(runes[:len(runes)-1])
-			}
-		case 1:
-			if len(me.artistName) > 0 {
-				runes := []rune(me.artistName)
-				me.artistName = string(runes[:len(runes)-1])
-			}
-		case 2:
-			if len(me.albumName) > 0 {
-				runes := []rune(me.albumName)
-				me.albumName = string(runes[:len(runes)-1])
-			}
-		}
-		m.metadataEditor = me
-		return m, nil
-
-	default:
-		if msg.Text != "" {
+	switch msg := msg.(type) {
+	case tea.PasteMsg:
+		if msg.Content != "" {
 			switch me.focus {
 			case 0:
-				me.trackName += msg.Text
+				me.trackName += msg.Content
 			case 1:
-				me.artistName += msg.Text
+				me.artistName += msg.Content
 			case 2:
-				me.albumName += msg.Text
+				me.albumName += msg.Content
 			}
 			m.metadataEditor = me
 		}
 		return m, nil
+
+	case tea.KeyPressMsg:
+		msg = normalizeKeyPress(msg)
+		switch {
+		case msg.Code == tea.KeyEscape:
+			m.metadataEditor = metadataEditor{}
+			m.status = []string{"metadata editing canceled"}
+			return m, nil
+
+		case msg.Code == tea.KeyTab && msg.Mod != tea.ModShift, msg.Code == tea.KeyDown:
+			me.focus = (me.focus + 1) % 3
+			m.metadataEditor = me
+			return m, nil
+
+		case (msg.Code == tea.KeyTab && msg.Mod == tea.ModShift), msg.Code == tea.KeyUp:
+			me.focus = (me.focus - 1 + 3) % 3
+			m.metadataEditor = me
+			return m, nil
+
+		case msg.Code == tea.KeyEnter:
+			m.trackName = strings.TrimSpace(me.trackName)
+			m.artistName = strings.TrimSpace(me.artistName)
+			m.albumName = strings.TrimSpace(me.albumName)
+			m.media = m.media.WithMetadata(m.trackName, m.artistName, m.albumName)
+			m.metadataEditor = metadataEditor{}
+			m.dirty = true
+			m.status = []string{"metadata updated"}
+			return m, nil
+
+		case msg.Code == tea.KeyBackspace:
+			switch me.focus {
+			case 0:
+				if len(me.trackName) > 0 {
+					runes := []rune(me.trackName)
+					me.trackName = string(runes[:len(runes)-1])
+				}
+			case 1:
+				if len(me.artistName) > 0 {
+					runes := []rune(me.artistName)
+					me.artistName = string(runes[:len(runes)-1])
+				}
+			case 2:
+				if len(me.albumName) > 0 {
+					runes := []rune(me.albumName)
+					me.albumName = string(runes[:len(runes)-1])
+				}
+			}
+			m.metadataEditor = me
+			return m, nil
+
+		default:
+			if msg.Text != "" {
+				switch me.focus {
+				case 0:
+					me.trackName += msg.Text
+				case 1:
+					me.artistName += msg.Text
+				case 2:
+					me.albumName += msg.Text
+				}
+				m.metadataEditor = me
+			}
+			return m, nil
+		}
 	}
+	return m, nil
 }
 
 func renderMetadataEditor(me metadataEditor, width, height int) string {

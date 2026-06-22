@@ -7,7 +7,8 @@ Implemented keybindings in the current TUI:
 | `Tab` | Global | Move focus to the next panel. |
 | `Shift+Tab` | Global | Move focus to the previous panel. |
 | `Ctrl-S` | Global | Save the current project draft. |
-| `Ctrl-P` | Global | Open the project picker to load or create a project draft. |
+| `Ctrl-O` | Global | Open the fetch modal to enter a YouTube URL or video ID. |
+| `Ctrl-P` | Global | Open the project picker to load a project draft; press `n` to create from URL. |
 | `j` / `Down` | Lyrics editor panel | Select the next lyric line. |
 | `k` / `Up` | Lyrics editor panel | Select the previous lyric line. |
 | `Space` | Global outside text edit | Play or pause playback. |

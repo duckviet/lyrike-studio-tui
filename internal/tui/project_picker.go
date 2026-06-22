@@ -16,7 +16,6 @@ type projectPickerMode uint8
 const (
 	projectPickerClosed projectPickerMode = iota
 	projectPickerChoose
-	projectPickerCreate
 	projectPickerConfirmLoad
 )
 
@@ -36,9 +35,6 @@ func (p projectPicker) withProjects(projects []draft.ProjectSummary) projectPick
 	p.projects = append([]draft.ProjectSummary(nil), projects...)
 	if p.selected >= len(p.projects) {
 		p.selected = max(0, len(p.projects)-1)
-	}
-	if len(p.projects) == 0 {
-		p.mode = projectPickerCreate
 	}
 	return p
 }
@@ -63,8 +59,6 @@ func (m Model) updateProjectPicker(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 	switch m.picker.mode {
 	case projectPickerChoose:
 		return m.updateProjectPickerChoose(msg), nil
-	case projectPickerCreate:
-		return m.updateProjectPickerCreate(msg), nil
 	case projectPickerConfirmLoad:
 		return m.updateProjectPickerConfirm(msg), nil
 	default:
@@ -78,9 +72,8 @@ func (m Model) updateProjectPickerChoose(msg tea.KeyPressMsg) Model {
 		m.picker = projectPicker{}
 		m.status = []string{"project picker canceled"}
 	case msg.Code == 'n':
-		m.picker.mode = projectPickerCreate
-		m.picker.input = ""
-		m.status = []string{"new project id"}
+		m = m.openFetchInput()
+		m.picker = projectPicker{}
 	case msg.Code == 'j' || msg.Code == tea.KeyDown:
 		if len(m.picker.projects) > 0 {
 			m.picker.selected = min(len(m.picker.projects)-1, m.picker.selected+1)
@@ -89,7 +82,6 @@ func (m Model) updateProjectPickerChoose(msg tea.KeyPressMsg) Model {
 		m.picker.selected = max(0, m.picker.selected-1)
 	case msg.Code == tea.KeyEnter:
 		if len(m.picker.projects) == 0 {
-			m.picker.mode = projectPickerCreate
 			return m
 		}
 		selected := m.picker.projects[m.picker.selected].ID
@@ -100,34 +92,6 @@ func (m Model) updateProjectPickerChoose(msg tea.KeyPressMsg) Model {
 			return m
 		}
 		m = m.loadProject(selected)
-	}
-	return m
-}
-
-func (m Model) updateProjectPickerCreate(msg tea.KeyPressMsg) Model {
-	switch msg.Code {
-	case tea.KeyEscape:
-		m.picker = projectPicker{}
-		m.status = []string{"new project canceled"}
-	case tea.KeyBackspace:
-		if m.picker.input != "" {
-			runes := []rune(m.picker.input)
-			m.picker.input = string(runes[:len(runes)-1])
-		}
-	case tea.KeyEnter:
-		id, err := draft.NewProjectID(m.picker.input)
-		if err != nil {
-			m.status = []string{"invalid project id: " + err.Error()}
-			return m
-		}
-		m.projectID = id
-		m.picker = projectPicker{}
-		m.dirty = true
-		m.status = []string{"project selected: " + id.String()}
-	default:
-		if msg.Text != "" {
-			m.picker.input += msg.Text
-		}
 	}
 	return m
 }
@@ -168,10 +132,6 @@ func renderProjectPicker(p projectPicker, width int, height int) string {
 	var builder strings.Builder
 	builder.WriteString("Projects\n")
 	switch p.mode {
-	case projectPickerCreate:
-		builder.WriteString("New project ID: ")
-		builder.WriteString(p.input)
-		builder.WriteString("\nEnter: create | Esc: cancel")
 	case projectPickerConfirmLoad:
 		builder.WriteString("Unsaved changes will be replaced.\n")
 		builder.WriteString("Enter: load ")
@@ -180,7 +140,7 @@ func renderProjectPicker(p projectPicker, width int, height int) string {
 	default:
 		if len(p.projects) == 0 {
 			builder.WriteString("No projects saved.\n")
-			builder.WriteString("n: new project | Esc: cancel")
+			builder.WriteString("n: new from URL | Esc: cancel")
 			break
 		}
 		for i, project := range p.projects {
@@ -194,7 +154,7 @@ func renderProjectPicker(p projectPicker, width int, height int) string {
 			}
 			builder.WriteString(fmt.Sprintf("%s%s  %s\n", prefix, project.ID.String(), title))
 		}
-		builder.WriteString("Enter: load | n: new | Esc: cancel")
+		builder.WriteString("Enter: load | n: new from URL | Esc: cancel")
 	}
 	content := "Project Picker\n" + builder.String()
 	return focusedBorder.

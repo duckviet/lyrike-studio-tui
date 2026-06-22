@@ -29,16 +29,17 @@ const (
 
 // Model is the root Bubble Tea model for the three-panel shell.
 type Model struct {
-	width    int
-	height   int
-	focus    focus
-	media    media.Panel
-	waveform waveform.Panel
-	editor   editor.Panel
-	publish  publish.Panel
-	status   []string
-	picker   projectPicker
-	dirty    bool
+	width      int
+	height     int
+	focus      focus
+	media      media.Panel
+	waveform   waveform.Panel
+	editor     editor.Panel
+	publish    publish.Panel
+	status     []string
+	picker     projectPicker
+	fetchInput fetchInput
+	dirty      bool
 
 	mediaDragging bool
 
