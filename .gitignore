@@ -17,3 +17,6 @@ coverage.out
 # ULW and agent evidence are local execution artifacts.
 /.omo/evidence/
 
+# Built binary at repo root
+/lyrike-studio-tui
+

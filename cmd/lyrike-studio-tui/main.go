@@ -8,6 +8,8 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"path/filepath"
+	"strings"
 	"time"
 
 	tea "charm.land/bubbletea/v2"
@@ -18,12 +20,24 @@ import (
 	"github.com/duckviet/lyrike-studio-tui/internal/playback"
 	"github.com/duckviet/lyrike-studio-tui/internal/playback/beep"
 	"github.com/duckviet/lyrike-studio-tui/internal/playback/mpv"
+	"github.com/duckviet/lyrike-studio-tui/internal/server"
+	"github.com/duckviet/lyrike-studio-tui/internal/server/cache"
+	"github.com/duckviet/lyrike-studio-tui/internal/server/lrclib"
+	"github.com/duckviet/lyrike-studio-tui/internal/server/transcription"
 	"github.com/duckviet/lyrike-studio-tui/internal/storage"
 	"github.com/duckviet/lyrike-studio-tui/internal/tui"
 	"github.com/duckviet/lyrike-studio-tui/internal/version"
 )
 
 func main() {
+	if len(os.Args) > 1 && os.Args[1] == "serve" {
+		if err := runServe(os.Args[2:]); err != nil {
+			fmt.Fprintf(os.Stderr, "serve: %v\n", err)
+			os.Exit(1)
+		}
+		return
+	}
+
 	versionRequested := flag.Bool("version", false, "print version and exit")
 	demoRequested := flag.Bool("demo", false, "launch the TUI demo")
 	backendFixtureRequested := flag.Bool("backend-fixture", false, "use deterministic backend fixture data in demo mode")
@@ -77,6 +91,35 @@ func runDemo(backendFixture bool) error {
 	return err
 }
 
+func runServe(args []string) error {
+	fs := flag.NewFlagSet("serve", flag.ContinueOnError)
+	port := fs.Int("port", 0, "backend port")
+	cacheDir := fs.String("cache-dir", "", "override cache directory (drafts live under <cache-dir>/drafts)")
+	if err := fs.Parse(args); err != nil {
+		return err
+	}
+	cfg, err := server.LoadConfig()
+	if err != nil {
+		return err
+	}
+	if *port != 0 {
+		cfg.Port = *port
+	}
+	if *cacheDir != "" {
+		cfg.CacheDir = *cacheDir
+		cfg.DraftDir = filepath.Join(*cacheDir, "drafts")
+	}
+	if err := server.WriteCookiesFromEnv(server.DefaultYouTubeCookiesPath); err != nil {
+		return err
+	}
+	store := cache.NewStore(cfg.CacheDir)
+	provider := transcription.NewTranscriber(cfg.OpenAIAPIKey, cfg.OpenAITranscriptionModel)
+	refiner := transcription.NewRefiner(cfg.OpenAIAPIKey)
+	manager := transcription.NewManager(store, provider, refiner)
+	srv := server.NewServer(cfg, store, manager, lrclib.NewProxy())
+	return http.ListenAndServe(fmt.Sprintf(":%d", cfg.Port), srv.Handler())
+}
+
 func runReal(backendURL, mpvSocket, videoID, projectIDValue, sourceURL, audioPath, importPath string) error {
 	client := backend.NewClient(backendURL)
 
@@ -85,13 +128,10 @@ func runReal(backendURL, mpvSocket, videoID, projectIDValue, sourceURL, audioPat
 
 	var statusMsg string
 
-	// 1. Try native beep player first if audio file or cache is found
+	// 1. Try native beep player first if audio file or backend audio URL is available
 	targetAudio := audioPath
 	if targetAudio == "" && videoID != "" {
-		cachePath := fmt.Sprintf("/home/duckviet/lrclib-upload/backend/.cache/audio/%s/original.mp4", videoID)
-		if _, err := os.Stat(cachePath); err == nil {
-			targetAudio = cachePath
-		}
+		targetAudio = strings.TrimRight(backendURL, "/") + "/local-api/audio/" + videoID
 	}
 
 	if targetAudio != "" {
@@ -128,7 +168,7 @@ func runReal(backendURL, mpvSocket, videoID, projectIDValue, sourceURL, audioPat
 
 	// Try loading draft or imported lyrics
 	doc := defaultDocument()
-	store := storage.NewDefaultStore()
+	store := storage.NewRemoteStore(client)
 	var projectID draft.ProjectID
 	if projectIDValue != "" {
 		id, err := draft.NewProjectID(projectIDValue)
@@ -142,6 +182,8 @@ func runReal(backendURL, mpvSocket, videoID, projectIDValue, sourceURL, audioPat
 		}
 	}
 
+	var loadedSnapshot draft.Snapshot
+	var loadedSnapshotErr error
 	if importPath != "" {
 		content, err := os.ReadFile(importPath)
 		if err == nil {
@@ -154,20 +196,19 @@ func runReal(backendURL, mpvSocket, videoID, projectIDValue, sourceURL, audioPat
 		} else {
 			statusMsg += " | failed to read import file: " + err.Error()
 		}
-	} else {
-		if projectID != "" {
-			if snapshot, err := store.Load(projectID); err == nil {
-				doc = snapshot.Document
-				statusMsg += " | loaded project " + projectID.String()
-			}
+	} else if projectID != "" {
+		loadedSnapshot, loadedSnapshotErr = store.Load(projectID)
+		if loadedSnapshotErr == nil {
+			doc = loadedSnapshot.Document
+			statusMsg += " | loaded project " + projectID.String()
+		} else {
+			statusMsg += " | failed to load project: " + loadedSnapshotErr.Error()
 		}
 	}
 
 	model := tui.NewModelWithDraftStore(doc, client, player, store, projectID, videoID, sourceURL)
-	if projectID != "" {
-		if snapshot, err := store.Load(projectID); err == nil {
-			model = model.WithProjectMetadata(snapshot.Metadata.TrackName, snapshot.Metadata.ArtistName, snapshot.Metadata.AlbumName)
-		}
+	if projectID != "" && loadedSnapshotErr == nil {
+		model = model.WithProjectMetadata(loadedSnapshot.Metadata.TrackName, loadedSnapshot.Metadata.ArtistName, loadedSnapshot.Metadata.AlbumName)
 	}
 	if projectID == "" && importPath == "" {
 		model = model.OpenProjectPickerOnStartup()

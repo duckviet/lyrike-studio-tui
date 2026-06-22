@@ -195,8 +195,8 @@ func (s *fakeServer) acceptLoop() {
 
 func (s *fakeServer) handleCommand(raw []byte) {
 	var msg struct {
-		Command   []any   `json:"command"`
-		RequestID int64   `json:"request_id"`
+		Command   []any `json:"command"`
+		RequestID int64 `json:"request_id"`
 	}
 	if err := json.Unmarshal(raw, &msg); err != nil {
 		return
@@ -248,9 +248,9 @@ func (s *fakeServer) sendPropertyChange(name string, value float64) {
 		return
 	}
 	b, _ := json.Marshal(map[string]any{
-		"event":        "property-change",
-		"name":         name,
-		"data":         value,
+		"event": "property-change",
+		"name":  name,
+		"data":  value,
 	})
 	b = append(b, '\n')
 	_, _ = s.conn.Write(b)

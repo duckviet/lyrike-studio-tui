@@ -257,4 +257,3 @@ func ParseLyrics(input string) (Document, error) {
 
 	return NewDocument(lines)
 }
-

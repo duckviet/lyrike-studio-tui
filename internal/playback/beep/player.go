@@ -9,10 +9,10 @@ import (
 	"sync"
 	"time"
 
+	"github.com/duckviet/lyrike-studio-tui/internal/playback"
 	"github.com/gopxl/beep/v2"
 	"github.com/gopxl/beep/v2/speaker"
 	"github.com/gopxl/beep/v2/wav"
-	"github.com/duckviet/lyrike-studio-tui/internal/playback"
 )
 
 var (

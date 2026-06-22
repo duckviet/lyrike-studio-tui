@@ -148,4 +148,3 @@ func renderMetadataEditor(me metadataEditor, width, height int) string {
 		Height(max(0, height-2)).
 		Render(lipgloss.NewStyle().Width(innerW).Render(content))
 }
-

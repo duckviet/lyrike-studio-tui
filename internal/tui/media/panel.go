@@ -218,4 +218,3 @@ func clamp(value int64, minimum int64, maximum int64) int64 {
 	}
 	return value
 }
-

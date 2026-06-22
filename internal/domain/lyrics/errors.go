@@ -49,4 +49,3 @@ func newValidationError(code ErrorCode, line int, field string, value string, me
 func NewValidationErrorPublic(code ErrorCode, message string) *ValidationError {
 	return &ValidationError{Code: code, Message: message}
 }
-

@@ -41,10 +41,10 @@ func DemoFixtureModel(baseURL string) (Model, error) {
 	dur, _ := playback.NewDuration(212000)
 	player, _ := playback.NewFakePlayer(dur)
 	client := backend.NewClient(baseURL)
-	
+
 	// Start playing immediately in the fake player for the demo test
 	_, _ = player.Play()
-	
+
 	m := NewModel(doc, client, player, "", "")
 	m.trackName = "Demo Track (Fixture)"
 	m.artistName = "Demo Artist"

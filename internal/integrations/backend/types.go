@@ -28,14 +28,14 @@ const (
 
 // PeaksResponse is the JSON body returned by GET /local-api/peaks/{video_id}.
 type PeaksResponse struct {
-	VideoID     string  `json:"videoId"`
-	Samples     int     `json:"samples"`
-	Duration    float64 `json:"duration"`
+	VideoID     string    `json:"videoId"`
+	Samples     int       `json:"samples"`
+	Duration    float64   `json:"duration"`
 	Peaks       []float64 `json:"peaks"`
-	SourceFile  string  `json:"sourceFile"`
-	GeneratedAt string  `json:"generatedAt"`
-	Source      Source  `json:"source"`
-	CacheHit    bool    `json:"cacheHit"`
+	SourceFile  string    `json:"sourceFile"`
+	GeneratedAt string    `json:"generatedAt"`
+	Source      Source    `json:"source"`
+	CacheHit    bool      `json:"cacheHit"`
 }
 
 // TranscriptionStatus is the discriminator for transcribe responses and SSE events.

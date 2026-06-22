@@ -40,10 +40,10 @@ type Model struct {
 	picker   projectPicker
 	dirty    bool
 
-	mediaDragging  bool
+	mediaDragging bool
 
-	client     *backend.Client
-	player     playback.Player
+	client         *backend.Client
+	player         playback.Player
 	draftStore     storage.Store
 	projectID      draft.ProjectID
 	videoID        string

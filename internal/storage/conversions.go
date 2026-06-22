@@ -23,6 +23,11 @@ type storedMetadata struct {
 	UpdatedAt  string `json:"updatedAt"`
 }
 
+type storedProjectSummary struct {
+	ID       string         `json:"id"`
+	Metadata storedMetadata `json:"metadata"`
+}
+
 func toStored(snapshot draft.Snapshot) storedSnapshot {
 	id := snapshot.ProjectID.String()
 	if id == "" {
@@ -78,5 +83,27 @@ func fromStored(stored storedSnapshot) (draft.Snapshot, error) {
 			UpdatedAt:  updatedAt,
 		},
 		Document: doc,
+	}, nil
+}
+
+func fromStoredProjectSummary(stored storedProjectSummary) (draft.ProjectSummary, error) {
+	id, err := draft.NewProjectID(stored.ID)
+	if err != nil {
+		return draft.ProjectSummary{}, fmt.Errorf("projectID: %w", err)
+	}
+	updatedAt, err := time.Parse(time.RFC3339Nano, stored.Metadata.UpdatedAt)
+	if err != nil {
+		return draft.ProjectSummary{}, fmt.Errorf("invalid updatedAt %q: %w", stored.Metadata.UpdatedAt, err)
+	}
+	return draft.ProjectSummary{
+		ID: id,
+		Metadata: draft.Metadata{
+			VideoID:    stored.Metadata.VideoID,
+			TrackName:  stored.Metadata.TrackName,
+			ArtistName: stored.Metadata.ArtistName,
+			AlbumName:  stored.Metadata.AlbumName,
+			Duration:   stored.Metadata.Duration,
+			UpdatedAt:  updatedAt,
+		},
 	}, nil
 }

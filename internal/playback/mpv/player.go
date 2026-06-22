@@ -80,7 +80,9 @@ func (p *Player) Close() error {
 		return nil
 	}
 	p.closed = true
-	close(p.stop)
+	if p.stop != nil {
+		close(p.stop)
+	}
 	conn := p.conn
 	p.mu.Unlock()
 
@@ -132,7 +134,6 @@ func (p *Player) Tick(_ playback.Duration) (playback.Snapshot, error) {
 	return p.Snapshot(), nil
 }
 
-
 func (p *Player) sendCommand(command []any) (any, error) {
 	p.mu.Lock()
 	if p.closed {
@@ -172,5 +173,3 @@ func (p *Player) sendCommand(command []any) (any, error) {
 		return nil, fmt.Errorf("mpv command timed out")
 	}
 }
-
-
