@@ -146,7 +146,7 @@ func Test_EditorEditModeOwnsPlaybackAndQuitKeys(t *testing.T) {
 	if got := model.editor.InputText; got != "First line q" {
 		t.Fatalf("input after edit-mode q = %q, want %q", got, "First line q")
 	}
-	if len(model.status) > 0 && model.status[0] == "quit ready" {
+	if model.status == "quit ready" {
 		t.Fatal("edit-mode q should not trigger quit")
 	}
 }

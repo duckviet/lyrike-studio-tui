@@ -29,35 +29,53 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case tea.KeyPressMsg:
-		if m.fetchInput.active() {
-			return m.updateFetchInput(msg)
+		if m.overlay != overlayNone {
+			return m.updateOverlay(msg)
 		}
-		if m.picker.active() {
-			return m.updateProjectPicker(msg)
-		}
-		if m.metadataEditor.active {
-			return m.updateMetadataEditor(msg)
+
+		if msg.Code == '?' && msg.Mod == 0 {
+			m.overlay = overlayHelp
+			m.help.reset()
+			return m, nil
 		}
 		return m.updateKey(msg)
 
 	case tea.PasteMsg:
-		if m.fetchInput.active() {
-			return m.updateFetchInput(msg)
-		}
-		if m.metadataEditor.active {
-			return m.updateMetadataEditor(msg)
+		if m.overlay != overlayNone {
+			return m.updateOverlay(msg)
 		}
 		return m.updateFocusedPanel(msg)
 
 	case tea.MouseMsg:
+		if m.overlay != overlayNone {
+			return m, nil
+		}
 		_, isMotion := msg.(tea.MouseMotionMsg)
 		var cmd tea.Cmd
 		m, cmd = m.handleMouse(msg, isMotion)
 		return m, cmd
 
+	case confirmProjectLoadMsg:
+		return m.loadProject(msg.id)
+
+	case cancelProjectLoadMsg:
+		m.overlay = overlaySelector
+		m.setStatus("project selector open")
+		return m, nil
+
+	case confirmFetchMsg:
+		return m.applyFetch(msg.videoID, msg.sourceURL)
+
+	case cancelFetchMsg:
+		m.overlay = overlayInput
+		m.fetchInput.activeState = true
+		m.fetchInput.input.Focus()
+		m.setStatus("fetch media: enter URL or video ID")
+		return m, nil
+
 	case fetchMediaMsg:
 		if msg.err != nil {
-			m.status = []string{"fetch failed: " + msg.err.Error()}
+			m.setErrorStatus("fetch failed: " + msg.err.Error())
 			return m, nil
 		}
 		m.videoID = msg.resp.VideoID
@@ -80,7 +98,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		m.media = m.media.WithMetadata(m.trackName, m.artistName, m.albumName).
 			WithTransport(media.TransportPaused, 0, int64(msg.resp.Duration)*1000)
-		m.status = []string{"fetch complete"}
+		m.setStatus("fetch complete")
 		return m, func() tea.Msg {
 			resp, err := m.client.Peaks(context.Background(), msg.resp.VideoID, backend.SourceOriginal, 2000)
 			return fetchPeaksMsg{resp: resp, err: err}
@@ -88,7 +106,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case fetchPeaksMsg:
 		if msg.err != nil {
-			m.status = []string{"peaks failed: " + msg.err.Error()}
+			m.setErrorStatus("peaks failed: " + msg.err.Error())
 			return m, nil
 		}
 		m.waveform = waveform.NewPanelWithPeaks(msg.resp.Peaks, int64(msg.resp.Duration)*1000).WithTheme(m.theme)
@@ -133,11 +151,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, m.requestAndSolveChallengeCmd()
 
 	case publish.CancelPublishMsg:
-		m.focus = focusEditor
+		m.overlay = overlayNone
 		return m, nil
 
 	case publish.StartPublishRetryMsg:
-		m.focus = focusPublish
 		return m, m.requestAndSolveChallengeCmd()
 
 	case challengeMsg:
@@ -164,16 +181,16 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case publishResultMsg:
 		m.publish = m.publish.Publish(msg.err)
 		if msg.err == nil {
-			m.status = []string{"publish success"}
+			m.setStatus("publish success")
 		} else {
-			m.status = []string{"publish failed: " + msg.err.Error()}
+			m.setErrorStatus("publish failed: " + msg.err.Error())
 		}
 		return m, nil
 
 	case backend.TranscribeResponse:
 		status := string(msg.Status())
 		m.media = m.media.WithTranscribeStatus(status)
-		m.status = []string{fmt.Sprintf("transcription status: %s", status)}
+		m.setStatus(fmt.Sprintf("transcription status: %s", status))
 
 		if msg.Status() == backend.TranscriptionCompleted {
 			if completedEvent, ok := msg.AsCompleted(); ok {
@@ -182,9 +199,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					m.editor.Document = doc
 					m.dirty = true
 					m.editor = m.editor.WithSelected(0)
-					m.status = []string{"transcription complete: lyrics loaded"}
+					m.setStatus("transcription complete: lyrics loaded")
 				} else {
-					m.status = []string{"transcription complete but failed to parse: " + err.Error()}
+					m.setErrorStatus("transcription complete but failed to parse: " + err.Error())
 				}
 			}
 			m.transcribeChan = nil
@@ -193,9 +210,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		if msg.Status() == backend.TranscriptionFailed {
 			if failedEvent, ok := msg.AsFailed(); ok {
-				m.status = []string{"transcription failed: " + failedEvent.Error}
+				m.setErrorStatus("transcription failed: " + failedEvent.Error)
 			} else {
-				m.status = []string{"transcription failed"}
+				m.setErrorStatus("transcription failed")
 			}
 			m.media = m.media.WithTranscribeStatus("")
 			m.transcribeChan = nil
@@ -205,7 +222,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, listenTranscribeCmd(m.transcribeChan)
 
 	case transcribeErrorMsg:
-		m.status = []string{"transcription failed: " + msg.err.Error()}
+		m.setErrorStatus("transcription failed: " + msg.err.Error())
 		m.media = m.media.WithTranscribeStatus("")
 		m.transcribeChan = nil
 		return m, nil
@@ -320,7 +337,7 @@ func (m Model) handleMouse(msg tea.MouseMsg, isMotion bool) (Model, tea.Cmd) {
 			} else if mouse.Button == tea.MouseLeft && !isMotion {
 				newPos := m.waveform.SeekForColumn(col, width)
 				m = m.seekToMS(newPos)
-				m.status = []string{fmt.Sprintf("seek: %dms", newPos)}
+				m.setStatus(fmt.Sprintf("seek: %dms", newPos))
 			}
 		} else {
 			m.waveform = m.waveform.WithHover(-1)
@@ -371,21 +388,21 @@ func listenTranscribeCmd(ch <-chan backend.TranscribeResponse) tea.Cmd {
 
 func (m Model) startTranscription() (Model, tea.Cmd) {
 	if m.client == nil {
-		m.status = []string{"cannot transcribe: client not initialized"}
+		m.setStatus("cannot transcribe: client not initialized")
 		return m, nil
 	}
 	if m.videoID == "" {
-		m.status = []string{"cannot transcribe: no video loaded"}
+		m.setStatus("cannot transcribe: no video loaded")
 		return m, nil
 	}
 	if m.transcribeChan != nil {
-		m.status = []string{"transcription already in progress"}
+		m.setStatus("transcription already in progress")
 		return m, nil
 	}
 
 	m.transcribeChan = make(chan backend.TranscribeResponse, 10)
 	m.media = m.media.WithTranscribeStatus("queued")
-	m.status = []string{"transcription queued..."}
+	m.setStatus("transcription queued...")
 
 	ch := m.transcribeChan
 	videoID := m.videoID

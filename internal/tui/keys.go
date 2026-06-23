@@ -41,7 +41,7 @@ func (m Model) applyRootKeyAction(action keyAction) (tea.Model, tea.Cmd) {
 	case keyActionOpenProjects:
 		m = m.openProjectPicker()
 	case keyActionPublish:
-		m.focus = focusPublish
+		m.overlay = overlayPublish
 		m.publish = m.publish.WithMetadata(m.trackName, m.artistName).
 			Confirm(lyrics.FormatLRC(m.editor.Document))
 	case keyActionOpenFetch:
@@ -59,7 +59,7 @@ func (m Model) applyRootKeyAction(action keyAction) (tea.Model, tea.Cmd) {
 	case keyActionTranscribe:
 		return m.startTranscription()
 	case keyActionQuit:
-		m.status = []string{"quit ready"}
+		m.setStatus("quit ready")
 		return m, tea.Quit
 	}
 	return m, nil
@@ -82,7 +82,7 @@ func (m Model) updateFocusedPanel(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.dirty = true
 		}
 		if key, ok := msg.(tea.KeyPressMsg); ok && key.Code == 't' {
-			m.status = []string{"tap-sync applied"}
+			m.setStatus("tap-sync applied")
 		}
 	case focusPublish:
 		if key, ok := msg.(tea.KeyPressMsg); ok {
@@ -103,10 +103,10 @@ func (m Model) togglePlayback() Model {
 	snap := m.player.Snapshot()
 	if snap.State == playback.StatePlaying {
 		_, _ = m.player.Pause()
-		m.status = []string{"playback paused"}
+		m.setStatus("playback paused")
 	} else {
 		_, _ = m.player.Play()
-		m.status = []string{"playback playing"}
+		m.setStatus("playback playing")
 	}
 	return m
 }
@@ -121,14 +121,14 @@ func (m Model) seekPlayback(deltaMS int64) Model {
 	pos, _ := playback.NewPosition(newPos)
 	_, _ = m.player.Seek(pos)
 	m.editor = m.editor.WithPlaybackPosition(newPos)
-	m.status = []string{fmt.Sprintf("seek: %dms", newPos)}
+	m.setStatus(fmt.Sprintf("seek: %dms", newPos))
 	return m
 }
 
 func (m Model) saveDraft() Model {
 	if m.projectID == "" {
 		m = m.openFetchInput()
-		m.status = []string{"fetch a video before saving"}
+		m.setStatus("fetch a video before saving")
 		return m
 	}
 	doc := m.editor.Document
@@ -166,9 +166,9 @@ func (m Model) saveDraft() Model {
 	err := m.draftStore.Save(snap)
 	if err == nil {
 		m.dirty = false
-		m.status = []string{"project saved: " + m.projectID.String()}
+		m.setStatus("project saved: " + m.projectID.String())
 	} else {
-		m.status = []string{"draft save failed: " + err.Error()}
+		m.setErrorStatus("draft save failed: " + err.Error())
 	}
 	return m
 }

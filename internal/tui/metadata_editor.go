@@ -22,7 +22,8 @@ func (m Model) openMetadataEditor() Model {
 		albumName:  m.albumName,
 		focus:      0,
 	}
-	m.status = []string{"metadata editor open"}
+	m.overlay = overlayMetadata
+	m.setStatus("metadata editor open")
 	return m
 }
 
@@ -49,7 +50,8 @@ func (m Model) updateMetadataEditor(msg tea.Msg) (Model, tea.Cmd) {
 		switch {
 		case msg.Code == tea.KeyEscape:
 			m.metadataEditor = metadataEditor{}
-			m.status = []string{"metadata editing canceled"}
+			m.overlay = overlayNone
+			m.setStatus("metadata editing canceled")
 			return m, nil
 
 		case msg.Code == tea.KeyTab && msg.Mod != tea.ModShift, msg.Code == tea.KeyDown:
@@ -68,8 +70,9 @@ func (m Model) updateMetadataEditor(msg tea.Msg) (Model, tea.Cmd) {
 			m.albumName = strings.TrimSpace(me.albumName)
 			m.media = m.media.WithMetadata(m.trackName, m.artistName, m.albumName)
 			m.metadataEditor = metadataEditor{}
+			m.overlay = overlayNone
 			m.dirty = true
-			m.status = []string{"metadata updated"}
+			m.setStatus("metadata updated")
 			return m, nil
 
 		case msg.Code == tea.KeyBackspace:
@@ -112,7 +115,13 @@ func (m Model) updateMetadataEditor(msg tea.Msg) (Model, tea.Cmd) {
 }
 
 func renderMetadataEditor(me metadataEditor, width, height int, th Theme) string {
-	innerW := max(0, width-4) // account for border (2) + padding (2)
+	boxWidth := width - 8
+	if boxWidth > 56 {
+		boxWidth = 56
+	}
+	if boxWidth < 20 {
+		boxWidth = width
+	}
 
 	titleStyle := th.Title
 	labelStyle := th.Dim
@@ -149,19 +158,9 @@ func renderMetadataEditor(me metadataEditor, width, height int, th Theme) string
 		lines = append(lines, "")
 	}
 
-	// Fill remaining height with empty lines, leaving 2 at the bottom for hint
-	contentH := height - 2 // inside border
-	hintLines := 2
-	fillerCount := contentH - len(lines) - hintLines
-	for i := 0; i < fillerCount; i++ {
-		lines = append(lines, "")
-	}
 	lines = append(lines, hintStyle.Render("Tab/↑↓: switch field"))
 	lines = append(lines, hintStyle.Render("Enter: save  Esc: cancel"))
 
 	content := strings.Join(lines, "\n")
-	return th.PaneActive.
-		Width(max(0, width-2)).
-		Height(max(0, height-2)).
-		Render(th.Value.Width(innerW).Render(content))
+	return overlayBlock(content, boxWidth, th)
 }

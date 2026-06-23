@@ -3,8 +3,10 @@ package tui
 import (
 	"context"
 	"io"
+	"strings"
 	"time"
 
+	"charm.land/bubbles/v2/textinput"
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/duckviet/lyrike-studio-tui/internal/domain/draft"
@@ -34,18 +36,23 @@ type PlayerFactory func(videoID string) (playback.Player, string)
 
 // Model is the root Bubble Tea model for the three-panel shell.
 type Model struct {
-	width      int
-	height     int
-	focus      focus
-	theme      Theme
-	media      media.Panel
-	waveform   waveform.Panel
-	editor     editor.Panel
-	publish    publish.Panel
-	status     []string
-	picker     projectPicker
-	fetchInput fetchInput
-	dirty      bool
+	width        int
+	height       int
+	focus        focus
+	theme        Theme
+	media        media.Panel
+	waveform     waveform.Panel
+	editor       editor.Panel
+	publish      publish.Panel
+	status       string
+	statusErr    bool
+	overlay      overlayKind
+	picker       selector
+	pickerTarget draft.ProjectID
+	confirm      confirmView
+	help         helpView
+	fetchInput   fetchInput
+	dirty        bool
 
 	mediaDragging bool
 
@@ -71,6 +78,12 @@ func NewModel(doc lyrics.Document, client *backend.Client, player playback.Playe
 
 func NewModelWithDraftStore(doc lyrics.Document, client *backend.Client, player playback.Player, store storage.Store, projectID draft.ProjectID, videoID string, sourceURL string) Model {
 	th := DefaultTheme()
+	ti := textinput.New()
+	ti.Prompt = th.Prompt.Render("❯ ")
+	styles := ti.Styles()
+	styles.Cursor.Blink = false
+	ti.SetStyles(styles)
+
 	return Model{
 		focus:      focusMedia,
 		theme:      th,
@@ -78,6 +91,10 @@ func NewModelWithDraftStore(doc lyrics.Document, client *backend.Client, player 
 		waveform:   waveform.NewPanel().WithTheme(th),
 		editor:     editor.NewPanel(doc).WithTheme(th),
 		publish:    publish.NewPanel(),
+		picker:     newSelector(th),
+		confirm:    confirmView{th: th},
+		help:       newHelpView(th),
+		fetchInput: fetchInput{input: ti},
 		client:     client,
 		player:     player,
 		draftStore: store,
@@ -98,8 +115,19 @@ func (m Model) WithPlayerFactory(factory PlayerFactory) Model {
 }
 
 func (m Model) WithStatus(lines []string) Model {
-	m.status = append([]string(nil), lines...)
+	m.status = strings.Join(lines, " | ")
+	m.statusErr = false
 	return m
+}
+
+func (m *Model) setStatus(status string) {
+	m.status = status
+	m.statusErr = false
+}
+
+func (m *Model) setErrorStatus(status string) {
+	m.status = status
+	m.statusErr = true
 }
 
 func (m Model) WithTheme(th Theme) Model {
@@ -107,6 +135,11 @@ func (m Model) WithTheme(th Theme) Model {
 	m.media = m.media.WithTheme(th)
 	m.waveform = m.waveform.WithTheme(th)
 	m.editor = m.editor.WithTheme(th)
+	m.picker.th = th
+	m.picker.input.Prompt = th.Prompt.Render("❯ ")
+	m.confirm.th = th
+	m.fetchInput.input.Prompt = th.Prompt.Render("❯ ")
+	m.help.th = th
 	return m
 }
 

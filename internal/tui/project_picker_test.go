@@ -71,8 +71,8 @@ func TestProjectSave_withoutProjectOpensFetchInput(t *testing.T) {
 	if !got.fetchInput.active() {
 		t.Fatalf("fetchInput.active = false, want true")
 	}
-	if got.picker.active() {
-		t.Fatalf("picker.active = true, want false")
+	if got.overlay == overlaySelector {
+		t.Fatalf("overlay = selector, want none")
 	}
 	if store.saves != 0 {
 		t.Fatalf("Save calls = %d, want 0", store.saves)
@@ -88,11 +88,11 @@ func TestProjectPicker_ctrlLOpensProjectList(t *testing.T) {
 	next, _ := model.Update(tea.KeyPressMsg{Code: 'l', Mod: tea.ModCtrl})
 	got := next.(Model)
 
-	if got.picker.mode != projectPickerChoose {
-		t.Fatalf("picker mode = %d, want choose", got.picker.mode)
+	if got.overlay != overlaySelector {
+		t.Fatalf("overlay = %d, want selector (%d)", got.overlay, overlaySelector)
 	}
-	if len(got.picker.projects) != 2 {
-		t.Fatalf("projects len = %d, want 2", len(got.picker.projects))
+	if len(got.picker.items) != 3 { // 1 virtual [New Project] + 2 projects
+		t.Fatalf("projects len = %d, want 3", len(got.picker.items))
 	}
 }
 
@@ -113,17 +113,27 @@ func TestProjectPicker_loadRequiresConfirmationWhenDirty(t *testing.T) {
 	model.dirty = true
 	model = model.openProjectPicker()
 
-	next, _ := model.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
+	// Move cursor down to project-b (index 1, since index 0 is virtual [New Project])
+	next, _ := model.Update(tea.KeyPressMsg{Code: tea.KeyDown})
+	model = next.(Model)
+
+	next, _ = model.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
 	confirm := next.(Model)
-	if confirm.picker.mode != projectPickerConfirmLoad {
-		t.Fatalf("picker mode = %d, want confirm", confirm.picker.mode)
+	if confirm.overlay != overlayConfirm {
+		t.Fatalf("overlay = %v, want confirm", confirm.overlay)
 	}
 	if confirm.projectID != projectA {
 		t.Fatalf("projectID = %q, want current project before confirm", confirm.projectID)
 	}
 
-	next, _ = confirm.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
-	got := next.(Model)
+	next, cmd := confirm.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
+	if cmd == nil {
+		t.Fatalf("expected non-nil command on confirm")
+	}
+	msg := cmd()
+	next2, _ := next.Update(msg)
+	got := next2.(Model)
+
 	if got.projectID != projectB {
 		t.Fatalf("projectID = %q, want %q", got.projectID, projectB)
 	}
@@ -156,6 +166,10 @@ func TestProjectPicker_loadReinitializesPlayerAndFetches(t *testing.T) {
 		WithPlayerFactory(factory)
 	model = model.openProjectPicker()
 
+	// Move cursor down to project-b (index 1)
+	next, _ := model.Update(tea.KeyPressMsg{Code: tea.KeyDown})
+	model = next.(Model)
+
 	next, cmd := model.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
 	got := next.(Model)
 	if got.projectID != projectB {
@@ -175,14 +189,15 @@ func TestProjectPickerNOpensFetchInput(t *testing.T) {
 	}
 	model := NewModelWithDraftStore(mustDemoDocument(t), nil, nil, store, "", "", "").openProjectPicker()
 
-	next, _ := model.Update(tea.KeyPressMsg{Code: 'n'})
+	// Ctrl-N keypress inside selector
+	next, _ := model.Update(tea.KeyPressMsg{Code: 'n', Mod: tea.ModCtrl})
 	got := next.(Model)
 
 	if !got.fetchInput.active() {
 		t.Fatalf("fetchInput.active = false, want true")
 	}
-	if got.picker.active() {
-		t.Fatalf("picker.active = true, want false")
+	if got.overlay == overlaySelector {
+		t.Fatalf("overlay = selector, want none")
 	}
 }
 
@@ -190,8 +205,8 @@ func TestProjectPickerNoProjectsShowsNewFromURL(t *testing.T) {
 	store := &memoryDraftStore{}
 	model := NewModelWithDraftStore(mustDemoDocument(t), nil, nil, store, "", "", "").openProjectPicker()
 
-	out := renderProjectPicker(model.picker, 80, 24, DefaultTheme())
-	if !strings.Contains(out, "new from URL") {
-		t.Fatalf("render missing 'new from URL': %q", out)
+	out := model.picker.View(180, 24)
+	if !strings.Contains(out, "[New Project]") {
+		t.Fatalf("render missing '[New Project]': %q", out)
 	}
 }

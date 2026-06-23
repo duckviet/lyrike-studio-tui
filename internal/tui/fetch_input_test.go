@@ -7,6 +7,7 @@ import (
 	"testing"
 	"unicode/utf8"
 
+	"charm.land/bubbles/v2/textinput"
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/duckviet/lyrike-studio-tui/internal/domain/draft"
@@ -107,14 +108,18 @@ func TestCtrlOOpensFetchInput(t *testing.T) {
 	if !got.fetchInput.active() {
 		t.Fatalf("fetchInput.active = false, want true")
 	}
-	if got.fetchInput.mode != fetchInputEnter {
-		t.Fatalf("fetchInput.mode = %d, want enter", got.fetchInput.mode)
+	if got.overlay != overlayInput {
+		t.Fatalf("overlay = %v, want overlayInput", got.overlay)
 	}
 }
 
 func TestRenderFetchInput(t *testing.T) {
 	th := DefaultTheme()
-	enter := renderFetchInput(fetchInput{mode: fetchInputEnter, input: "abc"}, 80, 24, th)
+	ti := textinput.New()
+	ti.SetValue("abc")
+	f := fetchInput{input: ti, activeState: true}
+
+	enter := renderFetchInput(f, 80, 24, th)
 	if !strings.Contains(enter, "YouTube URL or video ID:") {
 		t.Fatalf("enter render missing prompt: %q", enter)
 	}
@@ -122,12 +127,18 @@ func TestRenderFetchInput(t *testing.T) {
 		t.Fatalf("enter render missing input: %q", enter)
 	}
 
-	confirm := renderFetchInput(fetchInput{mode: fetchInputConfirmReplace, targetVideoID: "newid"}, 80, 24, th)
+	c := confirmView{
+		th:      th,
+		title:   "Unsaved changes",
+		message: "Discard current work?",
+		danger:  true,
+	}
+	confirm := c.View(80, 24)
 	if !strings.Contains(confirm, "Unsaved changes") {
 		t.Fatalf("confirm render missing warning: %q", confirm)
 	}
-	if !strings.Contains(confirm, "newid") {
-		t.Fatalf("confirm render missing target id: %q", confirm)
+	if !strings.Contains(confirm, "Discard current work?") {
+		t.Fatalf("confirm render missing target: %q", confirm)
 	}
 }
 
@@ -141,8 +152,11 @@ func typeIntoFetchInput(t *testing.T, m Model, text string) Model {
 }
 
 func TestRenderFetchInputFits80x24(t *testing.T) {
-	longInput := strings.Repeat("a", 120)
-	out := renderFetchInput(fetchInput{mode: fetchInputEnter, input: longInput}, 80, 24, DefaultTheme())
+	ti := textinput.New()
+	ti.SetValue(strings.Repeat("a", 120))
+	f := fetchInput{input: ti, activeState: true}
+
+	out := renderFetchInput(f, 80, 24, DefaultTheme())
 	lines := strings.Split(out, "\n")
 	if len(lines) > 24 {
 		t.Fatalf("rendered %d lines, want <= 24", len(lines))
@@ -224,18 +238,23 @@ func TestFetchInputDirtyConfirm(t *testing.T) {
 
 	next, _ := model.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
 	confirm := next.(Model)
-	if confirm.fetchInput.mode != fetchInputConfirmReplace {
-		t.Fatalf("fetchInput.mode = %d, want confirm replace", confirm.fetchInput.mode)
+	if confirm.overlay != overlayConfirm {
+		t.Fatalf("overlay = %v, want overlayConfirm", confirm.overlay)
 	}
-	if confirm.fetchInput.targetVideoID != "newid" {
-		t.Fatalf("targetVideoID = %q, want newid", confirm.fetchInput.targetVideoID)
+	if !strings.Contains(confirm.confirm.title, "Unsaved changes") {
+		t.Fatalf("confirm title = %q, want Unsaved changes", confirm.confirm.title)
 	}
 	if confirm.projectID != draft.ProjectID("oldid") {
 		t.Fatalf("projectID = %q, want oldid before confirm", confirm.projectID)
 	}
 
-	next, _ = confirm.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
-	got := next.(Model)
+	next, cmd := confirm.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
+	if cmd == nil {
+		t.Fatalf("expected non-nil command on confirm")
+	}
+	msg := cmd()
+	next2, _ := next.Update(msg)
+	got := next2.(Model)
 	if got.projectID != draft.ProjectID("newid") {
 		t.Fatalf("projectID = %q, want newid", got.projectID)
 	}
@@ -252,7 +271,7 @@ func TestFetchInputInvalidInput(t *testing.T) {
 	if !got.fetchInput.active() {
 		t.Fatalf("fetchInput.active = false, want true")
 	}
-	if len(got.status) == 0 || !strings.Contains(strings.ToLower(got.status[0]), "invalid") {
+	if got.status == "" || !strings.Contains(strings.ToLower(got.status), "invalid") {
 		t.Fatalf("status = %q, want invalid message", got.status)
 	}
 }
@@ -262,7 +281,7 @@ func TestFetchInputPaste(t *testing.T) {
 	next, _ := model.Update(tea.PasteMsg{Content: "https://www.youtube.com/watch?v=P0N0h_EOS-c"})
 	got := next.(Model)
 
-	if got.fetchInput.input != "https://www.youtube.com/watch?v=P0N0h_EOS-c" {
-		t.Fatalf("fetchInput.input = %q, want https://www.youtube.com/watch?v=P0N0h_EOS-c", got.fetchInput.input)
+	if got.fetchInput.input.Value() != "https://www.youtube.com/watch?v=P0N0h_EOS-c" {
+		t.Fatalf("fetchInput.input = %q, want https://www.youtube.com/watch?v=P0N0h_EOS-c", got.fetchInput.input.Value())
 	}
 }

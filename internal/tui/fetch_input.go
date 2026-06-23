@@ -7,7 +7,8 @@ import (
 	"os"
 	"strings"
 
-	"charm.land/bubbletea/v2"
+	"charm.land/bubbles/v2/textinput"
+	tea "charm.land/bubbletea/v2"
 
 	"github.com/duckviet/lyrike-studio-tui/internal/domain/draft"
 	"github.com/duckviet/lyrike-studio-tui/internal/domain/lyrics"
@@ -17,28 +18,22 @@ import (
 	"github.com/duckviet/lyrike-studio-tui/internal/tui/media"
 )
 
-type fetchInputMode uint8
-
-const (
-	fetchInputClosed fetchInputMode = iota
-	fetchInputEnter
-	fetchInputConfirmReplace
-)
-
 type fetchInput struct {
-	input           string
-	mode            fetchInputMode
-	targetVideoID   string
-	targetSourceURL string
+	input       textinput.Model
+	activeState bool
 }
 
 func (f fetchInput) active() bool {
-	return f.mode != fetchInputClosed
+	return f.activeState
 }
 
 func (m Model) openFetchInput() Model {
-	m.fetchInput = fetchInput{mode: fetchInputEnter}
-	m.status = []string{"fetch media: enter URL or video ID"}
+	m.fetchInput.activeState = true
+	m.fetchInput.input.SetValue("")
+	m.fetchInput.input.Placeholder = "YouTube URL or video ID..."
+	m.fetchInput.input.Focus()
+	m.overlay = overlayInput
+	m.setStatus("fetch media: enter URL or video ID")
 	return m
 }
 
@@ -46,10 +41,6 @@ func isURL(s string) bool {
 	return strings.Contains(s, "://")
 }
 
-// parseVideoIDInput extracts a YouTube video ID and optional source URL from
-// user input. It accepts watch URLs, youtu.be short links, music.youtube.com
-// URLs, embed/v paths, or a bare video ID. The logic mirrors the backend's
-// extractYouTubeVideoID without importing internal/server.
 func parseVideoIDInput(raw string) (videoID, sourceURL string, ok bool) {
 	trimmed := strings.TrimSpace(raw)
 	if trimmed == "" {
@@ -95,35 +86,24 @@ func parseVideoIDInput(raw string) (videoID, sourceURL string, ok bool) {
 }
 
 func renderFetchInput(f fetchInput, width int, height int, th Theme) string {
-	var content strings.Builder
-	content.WriteString("Fetch Media\n")
-
-	switch f.mode {
-	case fetchInputConfirmReplace:
-		content.WriteString("Unsaved changes will be replaced.\n")
-		content.WriteString("Enter: fetch ")
-		content.WriteString(f.targetVideoID)
-		content.WriteString(" | Esc: cancel")
-	default:
-		content.WriteString("YouTube URL or video ID:\n")
-		maxInput := max(0, width-4)
-		input := f.input
-		if len(input) > maxInput {
-			input = input[:maxInput]
-		}
-		content.WriteString(input)
-		content.WriteString("\nEnter: fetch | Esc: cancel")
+	boxWidth := width - 8
+	if boxWidth > 56 {
+		boxWidth = 56
+	}
+	if boxWidth < 20 {
+		boxWidth = width
 	}
 
-	return th.PaneActive.
-		Width(max(0, width-2)).
-		Height(max(0, height-2)).
-		Render(th.Text.Width(max(0, width-4)).Render(content.String()))
+	var content strings.Builder
+	content.WriteString(th.ModalTitle.Render("Fetch Media") + "\n\n")
+	content.WriteString(th.Text.Render("YouTube URL or video ID:") + "\n")
+	content.WriteString(f.input.View() + "\n\n")
+	content.WriteString(th.FooterKey.Render("Enter") + " " + th.FooterDesc.Render("fetch") + "   " +
+		th.FooterKey.Render("Esc") + " " + th.FooterDesc.Render("cancel"))
+
+	return overlayBlock(content.String(), boxWidth, th)
 }
 
-// newDefaultDocument returns a one-line placeholder document used when
-// starting a new project from a URL or video ID.
-// dup ok: TUI default doc (see cmd/lyrike-studio-tui/main.go defaultDocument).
 func newDefaultDocument() lyrics.Document {
 	ts, _ := lyrics.NewTimestamp(0)
 	te, _ := lyrics.NewTimestamp(10_000)
@@ -134,56 +114,54 @@ func newDefaultDocument() lyrics.Document {
 }
 
 func (m Model) updateFetchInput(msg tea.Msg) (tea.Model, tea.Cmd) {
+	var cmd tea.Cmd
 	switch msg := msg.(type) {
-	case tea.PasteMsg:
-		m.fetchInput.input += msg.Content
 	case tea.KeyPressMsg:
 		switch msg.Code {
 		case tea.KeyEscape:
-			m.fetchInput = fetchInput{}
-			m.status = []string{"fetch canceled"}
-		case tea.KeyBackspace:
-			if m.fetchInput.input != "" {
-				runes := []rune(m.fetchInput.input)
-				m.fetchInput.input = string(runes[:len(runes)-1])
-			}
+			m.overlay = overlayNone
+			m.fetchInput.activeState = false
+			m.setStatus("fetch canceled")
+			return m, nil
 		case tea.KeyEnter:
 			return m.submitFetchInput()
-		default:
-			if msg.Text != "" {
-				m.fetchInput.input += msg.Text
-			}
 		}
 	}
-	return m, nil
+	m.fetchInput.input, cmd = m.fetchInput.input.Update(msg)
+	return m, cmd
 }
 
 func (m Model) submitFetchInput() (tea.Model, tea.Cmd) {
-	if m.fetchInput.mode == fetchInputConfirmReplace {
-		return m.applyFetch(m.fetchInput.targetVideoID, m.fetchInput.targetSourceURL)
-	}
-
-	videoID, sourceURL, ok := parseVideoIDInput(m.fetchInput.input)
+	videoID, sourceURL, ok := parseVideoIDInput(m.fetchInput.input.Value())
 	if !ok {
-		m.status = []string{"invalid url or video id"}
+		m.setErrorStatus("invalid url or video id")
 		return m, nil
 	}
 
 	if m.dirty && m.projectID != "" && draft.ProjectID(videoID) != m.projectID {
-		m.fetchInput.mode = fetchInputConfirmReplace
-		m.fetchInput.targetVideoID = videoID
-		m.fetchInput.targetSourceURL = sourceURL
-		m.status = []string{"unsaved changes: Enter confirms fetch"}
-		return m, nil
+		m.fetchInput.activeState = false
+		return m.confirmAction(
+			"Unsaved changes",
+			"Discard current work and fetch new project?",
+			true,
+			func() tea.Msg {
+				return confirmFetchMsg{videoID: videoID, sourceURL: sourceURL}
+			},
+			func() tea.Msg {
+				return cancelFetchMsg{}
+			},
+		), nil
 	}
 
+	m.overlay = overlayNone
+	m.fetchInput.activeState = false
 	return m.applyFetch(videoID, sourceURL)
 }
 
 func (m Model) applyFetch(videoID, sourceURL string) (tea.Model, tea.Cmd) {
 	pid, err := draft.NewProjectID(videoID)
 	if err != nil {
-		m.status = []string{"invalid video id: " + err.Error()}
+		m.setErrorStatus("invalid video id: " + err.Error())
 		return m, nil
 	}
 
@@ -191,17 +169,17 @@ func (m Model) applyFetch(videoID, sourceURL string) (tea.Model, tea.Cmd) {
 	if err == nil && snapshot.ProjectID != "" {
 		m.sourceURL = sourceURL
 		m, cmd := m.loadProject(pid)
-		m.fetchInput = fetchInput{}
+		m.fetchInput.activeState = false
 		if m.client == nil {
-			m.status = []string{"backend unavailable"}
+			m.setErrorStatus("backend unavailable")
 			return m, nil
 		}
 		return m, cmd
 	}
 
 	if !isNotFoundError(err) {
-		m.status = []string{"project load failed: " + err.Error()}
-		m.fetchInput = fetchInput{}
+		m.setErrorStatus("project load failed: " + err.Error())
+		m.fetchInput.activeState = false
 		return m, nil
 	}
 
@@ -214,10 +192,10 @@ func (m Model) applyFetch(videoID, sourceURL string) (tea.Model, tea.Cmd) {
 	m.editor = editor.NewPanel(newDefaultDocument()).WithTheme(m.theme)
 	m.media = media.NewPanel().WithTheme(m.theme)
 	m.dirty = true
-	m.fetchInput = fetchInput{}
-	m.status = []string{"new project: " + pid.String()}
+	m.fetchInput.activeState = false
+	m.setStatus("new project: " + pid.String())
 	if m.client == nil {
-		m.status = []string{"backend unavailable"}
+		m.setErrorStatus("backend unavailable")
 		return m, nil
 	}
 	return m, m.fetchCmd(videoID, sourceURL)
@@ -240,3 +218,10 @@ func (m Model) fetchCmd(videoID, sourceURL string) tea.Cmd {
 		return fetchMediaMsg{resp: resp, err: err}
 	}
 }
+
+type confirmFetchMsg struct {
+	videoID   string
+	sourceURL string
+}
+
+type cancelFetchMsg struct{}

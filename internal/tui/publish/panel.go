@@ -69,6 +69,14 @@ func (p Panel) RetryCount() int {
 	return p.retry
 }
 
+func (p Panel) TrackName() string {
+	return p.trackName
+}
+
+func (p Panel) ArtistName() string {
+	return p.artistName
+}
+
 func (p Panel) Validate(lyrics string) (Panel, error) {
 	if lyrics == "" {
 		p.state = StateFailed

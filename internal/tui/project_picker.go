@@ -1,9 +1,7 @@
 package tui
 
 import (
-	"fmt"
 	"io"
-	"strings"
 
 	tea "charm.land/bubbletea/v2"
 
@@ -11,42 +9,40 @@ import (
 	"github.com/duckviet/lyrike-studio-tui/internal/tui/editor"
 )
 
-type projectPickerMode uint8
-
-const (
-	projectPickerClosed projectPickerMode = iota
-	projectPickerChoose
-	projectPickerConfirmLoad
-)
-
-type projectPicker struct {
-	mode     projectPickerMode
-	projects []draft.ProjectSummary
-	selected int
-	input    string
-	target   draft.ProjectID
-}
-
-func (p projectPicker) active() bool {
-	return p.mode != projectPickerClosed
-}
-
-func (p projectPicker) withProjects(projects []draft.ProjectSummary) projectPicker {
-	p.projects = append([]draft.ProjectSummary(nil), projects...)
-	if p.selected >= len(p.projects) {
-		p.selected = max(0, len(p.projects)-1)
-	}
-	return p
-}
-
 func (m Model) openProjectPicker() Model {
 	projects, err := m.draftStore.ListProjects()
 	if err != nil {
-		m.status = []string{"project list failed: " + err.Error()}
+		m.setErrorStatus("project list failed: " + err.Error())
 		return m
 	}
-	m.picker = projectPicker{mode: projectPickerChoose}.withProjects(projects)
-	m.status = []string{"project picker open"}
+
+	var items []selItem
+	// Add virtual [New Project] item at index 0
+	items = append(items, selItem{
+		title: "[New Project]",
+		desc:  "Start a new project from a URL or video ID",
+		id:    "__new_project__",
+	})
+
+	for _, p := range projects {
+		title := p.Metadata.TrackName
+		if title == "" {
+			title = p.ID.String()
+		}
+		desc := p.Metadata.ArtistName
+		if desc == "" {
+			desc = "No Artist"
+		}
+		items = append(items, selItem{
+			title: title,
+			desc:  desc,
+			id:    p.ID.String(),
+		})
+	}
+
+	m.picker.open(selResource, "Select Project", "Search...", items, false)
+	m.overlay = overlaySelector
+	m.setStatus("project selector open")
 	return m
 }
 
@@ -54,64 +50,10 @@ func (m Model) OpenProjectPickerOnStartup() Model {
 	return m.openProjectPicker()
 }
 
-func (m Model) updateProjectPicker(msg tea.KeyPressMsg) (Model, tea.Cmd) {
-	msg = normalizeKeyPress(msg)
-	switch m.picker.mode {
-	case projectPickerChoose:
-		return m.updateProjectPickerChoose(msg)
-	case projectPickerConfirmLoad:
-		return m.updateProjectPickerConfirm(msg)
-	default:
-		return m, nil
-	}
-}
-
-func (m Model) updateProjectPickerChoose(msg tea.KeyPressMsg) (Model, tea.Cmd) {
-	switch {
-	case msg.Code == tea.KeyEscape:
-		m.picker = projectPicker{}
-		m.status = []string{"project picker canceled"}
-	case msg.Code == 'n':
-		m = m.openFetchInput()
-		m.picker = projectPicker{}
-	case msg.Code == 'j' || msg.Code == tea.KeyDown:
-		if len(m.picker.projects) > 0 {
-			m.picker.selected = min(len(m.picker.projects)-1, m.picker.selected+1)
-		}
-	case msg.Code == 'k' || msg.Code == tea.KeyUp:
-		m.picker.selected = max(0, m.picker.selected-1)
-	case msg.Code == tea.KeyEnter:
-		if len(m.picker.projects) == 0 {
-			return m, nil
-		}
-		selected := m.picker.projects[m.picker.selected].ID
-		if m.dirty && selected != m.projectID {
-			m.picker.mode = projectPickerConfirmLoad
-			m.picker.target = selected
-			m.status = []string{"unsaved changes: Enter confirms project load"}
-			return m, nil
-		}
-		return m.loadProject(selected)
-	}
-	return m, nil
-}
-
-func (m Model) updateProjectPickerConfirm(msg tea.KeyPressMsg) (Model, tea.Cmd) {
-	switch msg.Code {
-	case tea.KeyEscape:
-		m.picker.mode = projectPickerChoose
-		m.picker.target = ""
-		m.status = []string{"project load canceled"}
-	case tea.KeyEnter:
-		return m.loadProject(m.picker.target)
-	}
-	return m, nil
-}
-
 func (m Model) loadProject(id draft.ProjectID) (Model, tea.Cmd) {
 	snapshot, err := m.draftStore.Load(id)
 	if err != nil {
-		m.status = []string{"project load failed: " + err.Error()}
+		m.setErrorStatus("project load failed: " + err.Error())
 		return m, nil
 	}
 	m.projectID = snapshot.ProjectID
@@ -121,10 +63,10 @@ func (m Model) loadProject(id draft.ProjectID) (Model, tea.Cmd) {
 	m.albumName = snapshot.Metadata.AlbumName
 	m.media = m.media.WithMetadata(m.trackName, m.artistName, m.albumName)
 	m.editor = editor.NewPanel(snapshot.Document).WithTheme(m.theme)
-	m.picker = projectPicker{}
 	m.dirty = false
 	m.focus = focusEditor
 
+	var cmd tea.Cmd
 	if m.playerFactory != nil && m.videoID != "" {
 		if closer, ok := m.player.(io.Closer); ok {
 			_ = closer.Close()
@@ -132,51 +74,16 @@ func (m Model) loadProject(id draft.ProjectID) (Model, tea.Cmd) {
 		newPlayer, status := m.playerFactory(m.videoID)
 		m.player = newPlayer
 		if status != "" {
-			m.status = []string{"project loaded: " + id.String() + " | " + status}
+			m.setStatus("project loaded: " + id.String() + " | " + status)
 		} else {
-			m.status = []string{"project loaded: " + id.String()}
+			m.setStatus("project loaded: " + id.String())
 		}
 	} else {
-		m.status = []string{"project loaded: " + id.String()}
+		m.setStatus("project loaded: " + id.String())
 	}
 
 	if m.client != nil && (m.videoID != "" || m.sourceURL != "") {
 		return m, m.fetchCmd(m.videoID, m.sourceURL)
 	}
-	return m, nil
-}
-
-func renderProjectPicker(p projectPicker, width int, height int, th Theme) string {
-	var builder strings.Builder
-	builder.WriteString("Projects\n")
-	switch p.mode {
-	case projectPickerConfirmLoad:
-		builder.WriteString("Unsaved changes will be replaced.\n")
-		builder.WriteString("Enter: load ")
-		builder.WriteString(p.target.String())
-		builder.WriteString(" | Esc: cancel")
-	default:
-		if len(p.projects) == 0 {
-			builder.WriteString("No projects saved.\n")
-			builder.WriteString("n: new from URL | Esc: cancel")
-			break
-		}
-		for i, project := range p.projects {
-			prefix := "  "
-			if i == p.selected {
-				prefix = "> "
-			}
-			title := project.Metadata.TrackName
-			if title == "" {
-				title = project.ID.String()
-			}
-			builder.WriteString(fmt.Sprintf("%s%s  %s\n", prefix, project.ID.String(), title))
-		}
-		builder.WriteString("Enter: load | n: new from URL | Esc: cancel")
-	}
-	content := "Project Picker\n" + builder.String()
-	return th.PaneActive.
-		Width(max(0, width-2)).
-		Height(max(0, height-2)).
-		Render(th.Text.Width(max(0, width-4)).Render(content))
+	return m, cmd
 }
