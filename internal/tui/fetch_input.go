@@ -30,7 +30,7 @@ func (f fetchInput) active() bool {
 func (m Model) openFetchInput() Model {
 	m.fetchInput.activeState = true
 	m.fetchInput.input.SetValue("")
-	m.fetchInput.input.Placeholder = "YouTube URL or video ID..."
+	m.fetchInput.input.Placeholder = ""
 	m.fetchInput.input.Focus()
 	m.overlay = overlayInput
 	m.setStatus("fetch media: enter URL or video ID")

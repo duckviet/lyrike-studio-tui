@@ -40,7 +40,7 @@ func (m Model) openProjectPicker() Model {
 		})
 	}
 
-	m.picker.open(selResource, "Select Project", "Search...", items, false)
+	m.picker.open(selResource, "Select Project", "", items, false)
 	m.overlay = overlaySelector
 	m.setStatus("project selector open")
 	return m
