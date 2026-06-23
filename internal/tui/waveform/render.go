@@ -65,20 +65,7 @@ func (p Panel) View(width int, height int) string {
 		isPlayed := col < cursor
 
 		// Determine base color based on played, loop, and amplitude
-		var colColor string
-		if isPlayed {
-			if inLoop {
-				colColor = lerpColor("#4338CA", "#818CF8", peak)
-			} else {
-				colColor = lerpColor("#5B21B6", "#C084FC", peak)
-			}
-		} else {
-			if inLoop {
-				colColor = lerpColor("#4B5563", "#9CA3AF", peak)
-			} else {
-				colColor = lerpColor("#3F3F46", "#8E9196", peak)
-			}
-		}
+		colColor := p.colorFor(peak, isPlayed, inLoop)
 		style := lipgloss.NewStyle().Foreground(lipgloss.Color(colColor))
 
 		for r := 0; r < wfHeight; r++ {
@@ -176,21 +163,7 @@ func (p Panel) viewSingleRow(width int) string {
 			glyph = '┃'
 		}
 
-		var colColor string
-		if isPlayed {
-			if inLoop {
-				colColor = lerpColor("#4338CA", "#818CF8", peak)
-			} else {
-				colColor = lerpColor("#5B21B6", "#C084FC", peak)
-			}
-		} else {
-			if inLoop {
-				colColor = lerpColor("#4B5563", "#9CA3AF", peak)
-			} else {
-				colColor = lerpColor("#3F3F46", "#8E9196", peak)
-			}
-		}
-
+		colColor := p.colorFor(peak, isPlayed, inLoop)
 		cellStr := string(glyph)
 		if isHover {
 			cellStr = p.theme.Knob.Render(cellStr)
@@ -201,4 +174,33 @@ func (p Panel) viewSingleRow(width int) string {
 		cells[col] = cellStr
 	}
 	return strings.Join(cells, "")
+}
+
+func (p Panel) colorFor(peak float64, isPlayed, inLoop bool) string {
+	accentHex := colorToHex(p.theme.P.Accent, "#7263E1")
+	accent2Hex := colorToHex(p.theme.P.Accent2, "#FF3366")
+	unplayedHex := colorToHex(p.theme.P.Unplayed, "#333333")
+	subduedHex := colorToHex(p.theme.P.Subdued, "#4A4A4A")
+	surfaceHex := colorToHex(p.theme.P.Surface, "#161616")
+	selFgHex := colorToHex(p.theme.P.SelFg, "#FFFFFF")
+
+	if isPlayed {
+		if inLoop {
+			start := lerpColor(surfaceHex, accent2Hex, 0.5)
+			end := lerpColor(accent2Hex, selFgHex, 0.3)
+			return lerpColor(start, end, peak)
+		} else {
+			start := lerpColor(surfaceHex, accentHex, 0.5)
+			end := lerpColor(accentHex, selFgHex, 0.3)
+			return lerpColor(start, end, peak)
+		}
+	} else {
+		if inLoop {
+			start := lerpColor(unplayedHex, accent2Hex, 0.1)
+			end := lerpColor(subduedHex, accent2Hex, 0.2)
+			return lerpColor(start, end, peak)
+		} else {
+			return lerpColor(unplayedHex, subduedHex, peak)
+		}
+	}
 }

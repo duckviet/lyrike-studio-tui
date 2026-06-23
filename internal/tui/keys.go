@@ -175,24 +175,38 @@ func (m Model) saveDraft() Model {
 
 func (m Model) nextFocus() focus {
 	switch m.focus {
-	case focusMedia:
-		return focusWaveform
-	case focusWaveform:
+	// case focusMedia:
+	// 	return focusWaveform
+	// case focusWaveform:
+	// 	return focusEditor
+	// case focusEditor:
+	// 	return focusMedia
+	// default:
+	// 	return focusMedia
+
+ 	case focusWaveform:
 		return focusEditor
 	case focusEditor:
-		return focusMedia
+		return focusWaveform
 	default:
-		return focusMedia
+		return focusWaveform
 	}
 }
 
 func (m Model) prevFocus() focus {
 	switch m.focus {
+	// case focusEditor:
+	// 	return focusWaveform
+	// case focusWaveform:
+	// 	return focusMedia
+	// case focusMedia:
+	// 	return focusEditor
+	// default:
+	// 	return focusEditor
+
 	case focusEditor:
 		return focusWaveform
 	case focusWaveform:
-		return focusMedia
-	case focusMedia:
 		return focusEditor
 	default:
 		return focusEditor

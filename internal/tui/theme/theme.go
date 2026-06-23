@@ -18,8 +18,9 @@ type Palette struct {
 	Fg       color.Color // body text (NoColor = terminal default)
 	Muted    color.Color // hints, dim text
 	Subdued  color.Color // secondary descriptions
-	Border   color.Color // box and rule borders
-	Surface  color.Color // dark background for inactive items
+	Border   color.Color // box and rule borders (used sparingly — active only)
+	Surface  color.Color // slightly elevated background for inactive panes
+	Surface2 color.Color // more elevated background for modals/overlays
 	Unplayed color.Color // unplayed waveform/progress segments
 	Good     color.Color // success
 	Warn     color.Color // warning
@@ -31,14 +32,15 @@ type Palette struct {
 // DefaultPalette returns the built-in lyrike-studio-tui palette.
 func DefaultPalette() Palette {
 	return Palette{
-		Accent:   lipgloss.Color("#7D56F4"),
+		Accent:   lipgloss.Color("#7263E1"),
 		Accent2:  lipgloss.Color("#FF3366"),
 		Fg:       lipgloss.NoColor{},
-		Muted:    lipgloss.Color("#888888"),
-		Subdued:  lipgloss.Color("#666666"),
-		Border:   lipgloss.Color("#555555"),
-		Surface:  lipgloss.Color("#2C2C2C"),
-		Unplayed: lipgloss.Color("#444444"),
+		Muted:    lipgloss.Color("#666666"),
+		Subdued:  lipgloss.Color("#4A4A4A"),
+		Border:   lipgloss.Color("#7263E1"), // accent color — border is rare, so make it count
+		Surface:  lipgloss.Color("#161616"), // inactive pane bg — just darker than terminal bg
+		Surface2: lipgloss.Color("#222222"), // modal/overlay bg — slightly elevated
+		Unplayed: lipgloss.Color("#333333"),
 		Good:     lipgloss.Color("#10B981"),
 		Warn:     lipgloss.Color("#F59E0B"),
 		Bad:      lipgloss.Color("#EF4444"),
@@ -64,6 +66,7 @@ type Theme struct {
 	SelItemSel  lipgloss.Style
 	SelDesc     lipgloss.Style
 
+	// Panes: active gets a border, inactive gets a background — not both.
 	PaneActive   lipgloss.Style
 	PaneInactive lipgloss.Style
 	Rule         lipgloss.Style
@@ -90,35 +93,60 @@ type Theme struct {
 	ErrorText    lipgloss.Style
 	Value        lipgloss.Style
 	Hint         lipgloss.Style
+
+	// PaneTitle variants — dim title text reinforces inactive state without border
+	PaneTitleActive   lipgloss.Style
+	PaneTitleInactive lipgloss.Style
 }
 
 // NewTheme builds all styles from a palette.
 func NewTheme(name string, p Palette) Theme {
 	t := Theme{Name: name, P: p}
 	border := lipgloss.NormalBorder()
-	rounded := lipgloss.RoundedBorder()
 
+	// ── Footer ──────────────────────────────────────────────────────────────
 	t.FooterKey = lipgloss.NewStyle().Foreground(p.Accent).Bold(true)
 	t.FooterDesc = lipgloss.NewStyle().Foreground(p.Muted)
 	t.StatusOK = lipgloss.NewStyle().Foreground(p.Good)
 	t.StatusErr = lipgloss.NewStyle().Foreground(p.Bad).Bold(true)
 
-	t.ModalBorder = lipgloss.NewStyle().Border(border).BorderForeground(p.Accent).Padding(1, 2)
+	// ── Modal ────────────────────────────────────────────────────────────────
+	t.ModalBorder = lipgloss.NewStyle().
+		Background(p.Surface2).
+		Padding(1, 2).
+		Border(lipgloss.ThickBorder(), false, false, false, true). // left-only
+		BorderForeground(p.Accent)
 	t.ModalTitle = lipgloss.NewStyle().Foreground(p.Accent).Bold(true)
 	t.Prompt = lipgloss.NewStyle().Foreground(p.Accent2).Bold(true)
 	t.SelItem = lipgloss.NewStyle().Foreground(p.Fg)
 	t.SelItemSel = lipgloss.NewStyle().Foreground(p.SelFg).Background(p.SelBg).Bold(true)
 	t.SelDesc = lipgloss.NewStyle().Foreground(p.Muted)
 
-	t.PaneActive = lipgloss.NewStyle().Border(rounded).BorderForeground(p.Accent).Padding(PanePaddingY, PanePaddingX)
-	t.PaneInactive = lipgloss.NewStyle().Border(rounded).BorderForeground(p.Border).Padding(PanePaddingY, PanePaddingX)
-	t.Rule = lipgloss.NewStyle().Foreground(p.Border)
+	// ── Panes ────────────────────────────────────────────────────────────────
+	t.PaneActive = lipgloss.NewStyle().
+		Border(border).
+		BorderForeground(p.Accent).
+		Background(p.Surface).
+		Padding(PanePaddingY, PanePaddingX)
 
+	t.PaneInactive = lipgloss.NewStyle().
+		Border(border).
+		BorderForeground(p.Surface).
+		Background(p.Surface).
+		Padding(PanePaddingY, PanePaddingX)
+
+	t.Rule = lipgloss.NewStyle().Foreground(p.Subdued)
+
+	t.PaneTitleActive = lipgloss.NewStyle().Foreground(p.Accent).Bold(true)
+	t.PaneTitleInactive = lipgloss.NewStyle().Foreground(p.Muted)
+
+	// ── Semantic ─────────────────────────────────────────────────────────────
 	t.Good = lipgloss.NewStyle().Foreground(p.Good)
 	t.Warn = lipgloss.NewStyle().Foreground(p.Warn)
 	t.Bad = lipgloss.NewStyle().Foreground(p.Bad)
 	t.Dim = lipgloss.NewStyle().Foreground(p.Muted)
 
+	// ── Text roles ───────────────────────────────────────────────────────────
 	t.Title = lipgloss.NewStyle().Foreground(p.Accent).Bold(true)
 	t.Subtitle = lipgloss.NewStyle().Foreground(p.Subdued).Italic(true)
 	t.Text = lipgloss.NewStyle().Foreground(p.Fg)

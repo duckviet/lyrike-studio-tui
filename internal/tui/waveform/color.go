@@ -2,9 +2,21 @@ package waveform
 
 import (
 	"fmt"
+	"image/color"
 	"math"
 	"strings"
 )
+
+func colorToHex(c color.Color, defaultHex string) string {
+	if c == nil {
+		return defaultHex
+	}
+	r, g, b, a := c.RGBA()
+	if r == 0 && g == 0 && b == 0 && a == 0 {
+		return defaultHex
+	}
+	return fmt.Sprintf("#%02X%02X%02X", r>>8, g>>8, b>>8)
+}
 
 func lerpColor(startHex, endHex string, frac float64) string {
 	startHex = strings.TrimPrefix(startHex, "#")

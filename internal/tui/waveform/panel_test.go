@@ -5,6 +5,7 @@ import (
 	"strings"
 	"testing"
 
+	"charm.land/lipgloss/v2"
 	"github.com/duckviet/lyrike-studio-tui/internal/domain/lyrics"
 	"github.com/duckviet/lyrike-studio-tui/internal/tui/theme"
 )
@@ -112,5 +113,31 @@ func TestWaveformFollowMode(t *testing.T) {
 	panel = panel.pan(500)
 	if panel.follow {
 		t.Fatal("expected follow to be disabled after panning")
+	}
+}
+
+func TestWaveformUsesThemeColors(t *testing.T) {
+	t.Parallel()
+
+	customPalette := theme.DefaultPalette()
+	customPalette.Accent = lipgloss.Color("#111111")
+	customPalette.Accent2 = lipgloss.Color("#222222")
+	customPalette.Surface = lipgloss.Color("#333333")
+	customPalette.SelFg = lipgloss.Color("#444444")
+	customPalette.Unplayed = lipgloss.Color("#555555")
+	customPalette.Subdued = lipgloss.Color("#666666")
+
+	th := theme.NewTheme("custom", customPalette)
+	panel := NewPanelWithPeaks([]float64{0.5}, 10_000).
+		WithTheme(th)
+
+	gotPlayedNormal := panel.colorFor(0.5, true, false)
+	if strings.Contains(gotPlayedNormal, "101010") || strings.Contains(strings.ToUpper(gotPlayedNormal), "FFFFFF") {
+		t.Errorf("colorFor played normal used hardcoded values: %s", gotPlayedNormal)
+	}
+
+	gotPlayedLoop := panel.colorFor(0.5, true, true)
+	if strings.Contains(gotPlayedLoop, "101010") || strings.Contains(strings.ToUpper(gotPlayedLoop), "FFFFFF") {
+		t.Errorf("colorFor played loop used hardcoded values: %s", gotPlayedLoop)
 	}
 }
