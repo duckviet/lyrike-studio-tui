@@ -53,6 +53,7 @@ func (p *Proxy) Publish(ctx context.Context, token string, body io.Reader) (io.R
 	}
 	req.Header.Set("User-Agent", userAgent)
 	req.Header.Set("X-Publish-Token", token)
+	req.Header.Set("Content-Type", "application/json")
 
 	resp, err := p.client.Do(req)
 	if err != nil {

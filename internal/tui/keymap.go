@@ -17,6 +17,8 @@ const (
 	keyActionToggleFollow
 	keyActionOpenFetch
 	keyActionQuit
+	keyActionTranscribe
+	keyActionPublish
 )
 
 func globalKeyAction(key tea.KeyPressMsg) keyAction {
@@ -27,12 +29,14 @@ func globalKeyAction(key tea.KeyPressMsg) keyAction {
 		return keyActionFocusNext
 	case key.Code == 's' && key.Mod == tea.ModCtrl:
 		return keyActionSaveDraft
-	case key.Code == 'p' && key.Mod == tea.ModCtrl:
+	case key.Code == 'l' && key.Mod == tea.ModCtrl:
 		return keyActionOpenProjects
 	case key.Code == 'e' && key.Mod == tea.ModCtrl:
 		return keyActionEditMetadata
 	case key.Code == 'o' && key.Mod == tea.ModCtrl:
 		return keyActionOpenFetch
+	case key.Code == 'p' && key.Mod == tea.ModCtrl:
+		return keyActionPublish
 	default:
 		return keyActionNone
 	}
@@ -60,6 +64,8 @@ func nonEditingRootKeyAction(key tea.KeyPressMsg) keyAction {
 		return keyActionToggleFollow
 	case key.Code == 'q' && key.Mod == 0:
 		return keyActionQuit
+	case key.Code == 't' && key.Mod == tea.ModCtrl:
+		return keyActionTranscribe
 	default:
 		return keyActionNone
 	}

@@ -7,6 +7,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/duckviet/lyrike-studio-tui/internal/domain/draft"
+	"github.com/duckviet/lyrike-studio-tui/internal/domain/lyrics"
 	"github.com/duckviet/lyrike-studio-tui/internal/playback"
 	"github.com/duckviet/lyrike-studio-tui/internal/tui/publish"
 )
@@ -39,6 +40,10 @@ func (m Model) applyRootKeyAction(action keyAction) (tea.Model, tea.Cmd) {
 		m = m.saveDraft()
 	case keyActionOpenProjects:
 		m = m.openProjectPicker()
+	case keyActionPublish:
+		m.focus = focusPublish
+		m.publish = m.publish.WithMetadata(m.trackName, m.artistName).
+			Confirm(lyrics.FormatLRC(m.editor.Document))
 	case keyActionOpenFetch:
 		m = m.openFetchInput()
 	case keyActionEditMetadata:
@@ -51,6 +56,8 @@ func (m Model) applyRootKeyAction(action keyAction) (tea.Model, tea.Cmd) {
 		m = m.seekPlayback(1000)
 	case keyActionToggleFollow:
 		m.waveform = m.waveform.ToggleFollow()
+	case keyActionTranscribe:
+		return m.startTranscription()
 	case keyActionQuit:
 		m.status = []string{"quit ready"}
 		return m, tea.Quit

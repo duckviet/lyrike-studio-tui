@@ -6,7 +6,8 @@ import (
 	"strings"
 
 	tea "charm.land/bubbletea/v2"
-	"charm.land/lipgloss/v2"
+
+	"github.com/duckviet/lyrike-studio-tui/internal/tui/theme"
 )
 
 type TransportState string
@@ -17,21 +18,29 @@ const (
 )
 
 type Panel struct {
-	Title      string
-	state      TransportState
-	positionMS int64
-	durationMS int64
-	trackName  string
-	artistName string
-	albumName  string
+	Title            string
+	state            TransportState
+	positionMS       int64
+	durationMS       int64
+	trackName        string
+	artistName       string
+	albumName        string
+	transcribeStatus string
+	theme            theme.Theme
 }
 
 func NewPanel() Panel {
 	return Panel{
-		Title:      "Media",
-		state:      TransportPaused,
-		durationMS: 10_000,
+		Title:            "Media",
+		state:            TransportPaused,
+		durationMS:       10_000,
+		transcribeStatus: "",
 	}
+}
+
+func (p Panel) WithTheme(t theme.Theme) Panel {
+	p.theme = t
+	return p
 }
 
 func (p Panel) WithTransport(state TransportState, positionMS int64, durationMS int64) Panel {
@@ -48,13 +57,19 @@ func (p Panel) WithMetadata(track, artist, album string) Panel {
 	return p
 }
 
+func (p Panel) WithTranscribeStatus(status string) Panel {
+	p.transcribeStatus = status
+	return p
+}
+
 // ProgressBarRow returns the 0-based row index of the progress bar within the
 // panel's content area (excluding the border). The caller adds the border offset.
 // Layout (each item = 1 row): Title, Track, Artist, Album, Spacing, Status, ProgressBar
 // Index inside the View() string:  0=Track,1=Artist,2=Album,3="",4=Status,5=ProgressBar
 // In renderMediaPanel rows[0]=Title, rows[1]=View content starting at Track.
 // So progress bar is at row index 1 (title) + 5 (lines before bar in View) + 1 (border top) = 7.
-const ProgressBarRow = 7 // absolute row inside panel border
+const ProgressBarRow = 7      // absolute row inside panel border
+const TranscribeButtonRow = 9 // absolute row inside panel border
 
 // SeekForX converts an X position (0-based, within the panel inner content)
 // to a playback position in milliseconds.
@@ -107,19 +122,19 @@ func (p Panel) View(width int, height int) string {
 		album = "Unknown Album"
 	}
 
-	trackStyle := lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("#7D56F4"))
-	artistStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#888888"))
-	albumStyle := lipgloss.NewStyle().Italic(true).Foreground(lipgloss.Color("#666666"))
+	trackStyle := p.theme.Title
+	artistStyle := p.theme.Dim
+	albumStyle := p.theme.Subtitle
 
 	stateStr := "Paused"
 	if p.state == TransportPlaying {
 		stateStr = "Playing"
 	}
-	statusStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#FF3366"))
+	statusStyle := p.theme.Status
 	statusLine := fmt.Sprintf("%s %s", p.icon(), statusStyle.Render(stateStr))
 
-	keyStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#7D56F4"))
-	descStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#666666"))
+	keyStyle := p.theme.Key
+	descStyle := p.theme.Desc
 
 	shortcuts := []string{
 		fmt.Sprintf("%s %s", keyStyle.Render("[Space]"), descStyle.Render("Play/Pause")),
@@ -134,6 +149,22 @@ func (p Panel) View(width int, height int) string {
 	lines = append(lines, "") // spacing
 	lines = append(lines, statusLine)
 	lines = append(lines, p.progressBar(width))
+	lines = append(lines, "") // spacing
+
+	// Transcribe button/status row
+	btnStyle := p.theme.Button
+	statusStyleVal := p.theme.Dim
+
+	var transcribeRow string
+	switch p.transcribeStatus {
+	case "queued":
+		transcribeRow = btnStyle.Render(" [Transcribe] ") + " " + statusStyleVal.Render("(Queued...)")
+	case "running":
+		transcribeRow = btnStyle.Render(" [Transcribe] ") + " " + statusStyleVal.Render("(Running...)")
+	default:
+		transcribeRow = btnStyle.Render(" [Ctrl-T] Transcribe ")
+	}
+	lines = append(lines, transcribeRow)
 
 	contentRowsCount := len(lines) + len(shortcuts) + 1
 	paddingNeeded := height - contentRowsCount
@@ -174,9 +205,9 @@ func (p Panel) progressBar(width int) string {
 
 	var playedPart, knob, unplayedPart string
 
-	playedStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#7D56F4"))
-	unplayedStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#444444"))
-	knobStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#FF3366"))
+	playedStyle := p.theme.Played
+	unplayedStyle := p.theme.Unplayed
+	knobStyle := p.theme.Knob
 
 	if filledWidth > 0 {
 		playedPart = playedStyle.Render(strings.Repeat("━", filledWidth-1))

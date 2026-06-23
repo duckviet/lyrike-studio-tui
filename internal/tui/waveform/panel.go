@@ -7,6 +7,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/duckviet/lyrike-studio-tui/internal/domain/lyrics"
+	"github.com/duckviet/lyrike-studio-tui/internal/tui/theme"
 )
 
 type Panel struct {
@@ -27,6 +28,7 @@ type Panel struct {
 	hoverCol int
 	lines    []lyrics.Line
 	follow   bool
+	theme    theme.Theme
 }
 
 func NewPanel() Panel {
@@ -49,6 +51,11 @@ func NewPanelWithPeaks(peaks []float64, durationMS int64) Panel {
 	panel.viewStartMS = 0
 	panel.viewEndMS = panel.durationMS
 	return panel.updateTitle()
+}
+
+func (p Panel) WithTheme(t theme.Theme) Panel {
+	p.theme = t
+	return p
 }
 
 func (p Panel) WithPosition(positionMS int64) Panel {

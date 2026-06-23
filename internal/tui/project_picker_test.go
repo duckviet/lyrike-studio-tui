@@ -8,6 +8,8 @@ import (
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/duckviet/lyrike-studio-tui/internal/domain/draft"
+	"github.com/duckviet/lyrike-studio-tui/internal/integrations/backend"
+	"github.com/duckviet/lyrike-studio-tui/internal/playback"
 	"github.com/duckviet/lyrike-studio-tui/internal/storage"
 )
 
@@ -77,13 +79,13 @@ func TestProjectSave_withoutProjectOpensFetchInput(t *testing.T) {
 	}
 }
 
-func TestProjectPicker_ctrlPOpensProjectList(t *testing.T) {
+func TestProjectPicker_ctrlLOpensProjectList(t *testing.T) {
 	store := &memoryDraftStore{
 		projects: []draft.ProjectSummary{{ID: "project-b"}, {ID: "project-a"}},
 	}
 	model := NewModelWithDraftStore(mustDemoDocument(t), nil, nil, store, "project-a", "", "")
 
-	next, _ := model.Update(tea.KeyPressMsg{Code: 'p', Mod: tea.ModCtrl})
+	next, _ := model.Update(tea.KeyPressMsg{Code: 'l', Mod: tea.ModCtrl})
 	got := next.(Model)
 
 	if got.picker.mode != projectPickerChoose {
@@ -130,6 +132,43 @@ func TestProjectPicker_loadRequiresConfirmationWhenDirty(t *testing.T) {
 	}
 }
 
+func TestProjectPicker_loadReinitializesPlayerAndFetches(t *testing.T) {
+	projectB := draft.ProjectID("project-b")
+	loaded := draft.Snapshot{
+		ProjectID: projectB,
+		ID:        draft.DraftID(projectB.String()),
+		Metadata:  draft.Metadata{VideoID: "vid-b", TrackName: "Loaded Track"},
+		Document:  mustDemoDocument(t),
+	}
+	store := &memoryDraftStore{
+		projects: []draft.ProjectSummary{{ID: projectB}},
+		loads:    map[draft.ProjectID]draft.Snapshot{projectB: loaded},
+	}
+	client := backend.NewClient("http://example.com")
+
+	factoryCalled := false
+	factory := func(videoID string) (playback.Player, string) {
+		factoryCalled = true
+		return nil, "factory status"
+	}
+
+	model := NewModelWithDraftStore(mustDemoDocument(t), client, nil, store, "", "", "").
+		WithPlayerFactory(factory)
+	model = model.openProjectPicker()
+
+	next, cmd := model.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
+	got := next.(Model)
+	if got.projectID != projectB {
+		t.Fatalf("projectID = %q, want %q", got.projectID, projectB)
+	}
+	if !factoryCalled {
+		t.Fatalf("player factory was not called")
+	}
+	if cmd == nil {
+		t.Fatalf("loadProject returned nil cmd, want fetch cmd")
+	}
+}
+
 func TestProjectPickerNOpensFetchInput(t *testing.T) {
 	store := &memoryDraftStore{
 		projects: []draft.ProjectSummary{{ID: "project-a"}},
@@ -151,7 +190,7 @@ func TestProjectPickerNoProjectsShowsNewFromURL(t *testing.T) {
 	store := &memoryDraftStore{}
 	model := NewModelWithDraftStore(mustDemoDocument(t), nil, nil, store, "", "", "").openProjectPicker()
 
-	out := renderProjectPicker(model.picker, 80, 24)
+	out := renderProjectPicker(model.picker, 80, 24, DefaultTheme())
 	if !strings.Contains(out, "new from URL") {
 		t.Fatalf("render missing 'new from URL': %q", out)
 	}

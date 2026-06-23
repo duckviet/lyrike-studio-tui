@@ -1,8 +1,10 @@
 package beep
 
 import (
+	"context"
 	"fmt"
 	"io"
+	"net/url"
 	"os"
 	"os/exec"
 	"strings"
@@ -10,23 +12,27 @@ import (
 	"time"
 
 	"github.com/duckviet/lyrike-studio-tui/internal/playback"
+	"github.com/duckviet/lyrike-studio-tui/internal/playback/audiourl"
 	"github.com/gopxl/beep/v2"
 	"github.com/gopxl/beep/v2/speaker"
 	"github.com/gopxl/beep/v2/wav"
 )
 
 var (
-	speakerOnce sync.Once
+	speakerMu      sync.Mutex
+	speakerInit    bool
+	speakerInitErr error
 )
 
 type Player struct {
-	filePath    string
-	tempWavPath string
-	wavFile     *os.File
-	streamer    beep.StreamSeekCloser
-	format      beep.Format
-	ctrl        *beep.Ctrl
-	duration    playback.Duration
+	filePath       string
+	downloadedPath string
+	tempWavPath    string
+	wavFile        *os.File
+	streamer       beep.StreamSeekCloser
+	format         beep.Format
+	ctrl           *beep.Ctrl
+	duration       playback.Duration
 }
 
 // Compile-time check to ensure Player implements playback.Player and io.Closer
@@ -39,19 +45,31 @@ func NewPlayer(filePath string) (*Player, error) {
 	}
 
 	targetPath := filePath
-	// If the file is not a WAV file, transcode it to a temporary WAV using ffmpeg.
-	if !strings.HasSuffix(strings.ToLower(filePath), ".wav") {
+	if isHTTPURL(filePath) {
+		ctx, cancel := context.WithTimeout(context.Background(), 120*time.Second)
+		defer cancel()
+		downloadedPath, _, err := audiourl.DownloadToTemp(ctx, filePath)
+		if err != nil {
+			return nil, fmt.Errorf("download audio url: %w", err)
+		}
+		p.downloadedPath = downloadedPath
+		targetPath = downloadedPath
+	}
+
+	if !strings.HasSuffix(strings.ToLower(targetPath), ".wav") {
 		tempFile, err := os.CreateTemp("", "lyrike-*.wav")
 		if err != nil {
+			p.cleanup()
 			return nil, fmt.Errorf("create temp file: %w", err)
 		}
 		tempWavPath := tempFile.Name()
 		tempFile.Close() // Close fd so ffmpeg can write to it
 
 		// Transcode synchronously
-		cmd := exec.Command("ffmpeg", "-y", "-i", filePath, "-acodec", "pcm_s16le", "-ac", "2", "-ar", "44100", tempWavPath)
+		cmd := exec.Command("ffmpeg", "-y", "-i", targetPath, "-acodec", "pcm_s16le", "-ac", "2", "-ar", "44100", tempWavPath)
 		if err := cmd.Run(); err != nil {
 			os.Remove(tempWavPath)
+			p.cleanup()
 			return nil, fmt.Errorf("ffmpeg transcoding failed: %w", err)
 		}
 
@@ -79,14 +97,15 @@ func NewPlayer(filePath string) (*Player, error) {
 	dur, _ := playback.NewDuration(durMS)
 	p.duration = dur
 
-	// Initialize speaker once using the track's sample rate.
-	var initErr error
-	speakerOnce.Do(func() {
-		initErr = speaker.Init(format.SampleRate, format.SampleRate.N(time.Millisecond*120))
-	})
-	if initErr != nil {
+	speakerMu.Lock()
+	if !speakerInit {
+		speakerInitErr = speaker.Init(format.SampleRate, format.SampleRate.N(time.Millisecond*120))
+		speakerInit = true
+	}
+	speakerMu.Unlock()
+	if speakerInitErr != nil {
 		p.cleanup()
-		return nil, fmt.Errorf("init speaker: %w", initErr)
+		return nil, fmt.Errorf("init speaker: %w", speakerInitErr)
 	}
 
 	p.ctrl = &beep.Ctrl{Streamer: streamer, Paused: true}
@@ -206,4 +225,14 @@ func (p *Player) cleanup() {
 		os.Remove(p.tempWavPath)
 		p.tempWavPath = ""
 	}
+
+	if p.downloadedPath != "" {
+		os.Remove(p.downloadedPath)
+		p.downloadedPath = ""
+	}
+}
+
+func isHTTPURL(s string) bool {
+	u, err := url.Parse(s)
+	return err == nil && (u.Scheme == "http" || u.Scheme == "https")
 }

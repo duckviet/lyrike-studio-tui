@@ -113,7 +113,8 @@ func TestCtrlOOpensFetchInput(t *testing.T) {
 }
 
 func TestRenderFetchInput(t *testing.T) {
-	enter := renderFetchInput(fetchInput{mode: fetchInputEnter, input: "abc"}, 80, 24)
+	th := DefaultTheme()
+	enter := renderFetchInput(fetchInput{mode: fetchInputEnter, input: "abc"}, 80, 24, th)
 	if !strings.Contains(enter, "YouTube URL or video ID:") {
 		t.Fatalf("enter render missing prompt: %q", enter)
 	}
@@ -121,7 +122,7 @@ func TestRenderFetchInput(t *testing.T) {
 		t.Fatalf("enter render missing input: %q", enter)
 	}
 
-	confirm := renderFetchInput(fetchInput{mode: fetchInputConfirmReplace, targetVideoID: "newid"}, 80, 24)
+	confirm := renderFetchInput(fetchInput{mode: fetchInputConfirmReplace, targetVideoID: "newid"}, 80, 24, th)
 	if !strings.Contains(confirm, "Unsaved changes") {
 		t.Fatalf("confirm render missing warning: %q", confirm)
 	}
@@ -141,7 +142,7 @@ func typeIntoFetchInput(t *testing.T, m Model, text string) Model {
 
 func TestRenderFetchInputFits80x24(t *testing.T) {
 	longInput := strings.Repeat("a", 120)
-	out := renderFetchInput(fetchInput{mode: fetchInputEnter, input: longInput}, 80, 24)
+	out := renderFetchInput(fetchInput{mode: fetchInputEnter, input: longInput}, 80, 24, DefaultTheme())
 	lines := strings.Split(out, "\n")
 	if len(lines) > 24 {
 		t.Fatalf("rendered %d lines, want <= 24", len(lines))

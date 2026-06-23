@@ -151,6 +151,14 @@ type FetchRequest struct {
 	VideoID string `json:"videoId,omitempty"`
 }
 
+// TranscribeRequest is the JSON body for POST /local-api/transcribe.
+type TranscribeRequest struct {
+	VideoID          string `json:"videoId"`
+	Force            bool   `json:"force"`
+	EnableRefinement bool   `json:"enableRefinement"`
+	Mode             string `json:"mode"`
+}
+
 // DecodeKind identifies which contract failed to decode.
 type DecodeKind string
 

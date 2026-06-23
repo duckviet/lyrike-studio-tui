@@ -64,6 +64,32 @@ func (c *Client) Fetch(ctx context.Context, req FetchRequest) (FetchResponse, er
 	return DecodeFetchResponse(mustReadBody(resp))
 }
 
+// Transcribe calls POST /local-api/transcribe.
+func (c *Client) Transcribe(ctx context.Context, req TranscribeRequest) (TranscribeResponse, error) {
+	body, err := json.Marshal(req)
+	if err != nil {
+		return TranscribeResponse{}, &DecodeError{Kind: DecodeKindTranscribe, Err: err}
+	}
+
+	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, c.baseURL+"/local-api/transcribe", bytes.NewReader(body))
+	if err != nil {
+		return TranscribeResponse{}, fmt.Errorf("transcribe: create request: %w", err)
+	}
+	httpReq.Header.Set("Content-Type", "application/json")
+
+	resp, err := c.do(httpReq)
+	if err != nil {
+		return TranscribeResponse{}, fmt.Errorf("transcribe: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusAccepted {
+		return TranscribeResponse{}, expectStatus(resp, http.StatusOK)
+	}
+
+	return DecodeTranscribeResponse(mustReadBody(resp))
+}
+
 // Peaks calls GET /local-api/peaks/{video_id}.
 func (c *Client) Peaks(ctx context.Context, videoID string, source Source, samples int) (PeaksResponse, error) {
 	u, err := url.Parse(c.baseURL + "/local-api/peaks/" + videoID)
@@ -138,8 +164,8 @@ func (c *Client) Publish(ctx context.Context, token string, payload PublishPaylo
 	}
 	defer resp.Body.Close()
 
-	if err := expectStatus(resp, http.StatusOK); err != nil {
-		return err
+	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusCreated {
+		return expectStatus(resp, http.StatusOK)
 	}
 	return nil
 }

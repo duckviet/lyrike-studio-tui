@@ -51,8 +51,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case tea.MouseMsg:
 		_, isMotion := msg.(tea.MouseMotionMsg)
-		m = m.handleMouse(msg, isMotion)
-		return m, nil
+		var cmd tea.Cmd
+		m, cmd = m.handleMouse(msg, isMotion)
+		return m, cmd
 
 	case fetchMediaMsg:
 		if msg.err != nil {
@@ -66,8 +67,12 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if msg.resp.SourceURL != nil {
 			m.sourceURL = *msg.resp.SourceURL
 		}
-		m.trackName = msg.resp.TrackName
-		m.artistName = msg.resp.ArtistName
+		if m.trackName == "" || m.trackName == "Unknown Track" || m.trackName == "No Track Loaded" {
+			m.trackName = msg.resp.TrackName
+		}
+		if m.artistName == "" || m.artistName == "Unknown Artist" {
+			m.artistName = msg.resp.ArtistName
+		}
 		if fp, ok := m.player.(*playback.FakePlayer); ok {
 			if dur, err := playback.NewDuration(int64(msg.resp.Duration) * 1000); err == nil {
 				fp.SetDuration(dur)
@@ -86,7 +91,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.status = []string{"peaks failed: " + msg.err.Error()}
 			return m, nil
 		}
-		m.waveform = waveform.NewPanelWithPeaks(msg.resp.Peaks, int64(msg.resp.Duration)*1000)
+		m.waveform = waveform.NewPanelWithPeaks(msg.resp.Peaks, int64(msg.resp.Duration)*1000).WithTheme(m.theme)
 		return m, nil
 
 	case editor.SeekToMSMsg:
@@ -119,14 +124,17 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		return m, tea.Batch(tickCmd(), cmd)
 
-	case editor.StartPublishMsg:
-		m.focus = focusPublish
+	case publish.ConfirmPublishMsg:
 		var err error
 		m.publish, err = m.publish.Validate(msg.Lyrics)
 		if err != nil {
 			return m, nil
 		}
 		return m, m.requestAndSolveChallengeCmd()
+
+	case publish.CancelPublishMsg:
+		m.focus = focusEditor
+		return m, nil
 
 	case publish.StartPublishRetryMsg:
 		m.focus = focusPublish
@@ -145,12 +153,13 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 		var err error
-		m.publish, err = m.publish.SolveChallenge(msg.token, "")
+		m.publish, err = m.publish.SolveChallenge(msg.prefix, msg.nonce)
 		if err != nil {
 			m.publish = m.publish.Publish(err)
 			return m, nil
 		}
-		return m, m.submitPublishCmd(msg.token)
+		token := backend.PublishToken(msg.prefix, msg.nonce)
+		return m, m.submitPublishCmd(token)
 
 	case publishResultMsg:
 		m.publish = m.publish.Publish(msg.err)
@@ -159,6 +168,51 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		} else {
 			m.status = []string{"publish failed: " + msg.err.Error()}
 		}
+		return m, nil
+
+	case backend.TranscribeResponse:
+		status := string(msg.Status())
+		m.media = m.media.WithTranscribeStatus(status)
+		m.status = []string{fmt.Sprintf("transcription status: %s", status)}
+
+		if msg.Status() == backend.TranscriptionCompleted {
+			if completedEvent, ok := msg.AsCompleted(); ok {
+				doc, err := lyrics.ParseLRC(completedEvent.Synced)
+				if err == nil {
+					m.editor.Document = doc
+					m.dirty = true
+					m.editor = m.editor.WithSelected(0)
+					m.status = []string{"transcription complete: lyrics loaded"}
+				} else {
+					m.status = []string{"transcription complete but failed to parse: " + err.Error()}
+				}
+			}
+			m.transcribeChan = nil
+			return m, nil
+		}
+
+		if msg.Status() == backend.TranscriptionFailed {
+			if failedEvent, ok := msg.AsFailed(); ok {
+				m.status = []string{"transcription failed: " + failedEvent.Error}
+			} else {
+				m.status = []string{"transcription failed"}
+			}
+			m.media = m.media.WithTranscribeStatus("")
+			m.transcribeChan = nil
+			return m, nil
+		}
+
+		return m, listenTranscribeCmd(m.transcribeChan)
+
+	case transcribeErrorMsg:
+		m.status = []string{"transcription failed: " + msg.err.Error()}
+		m.media = m.media.WithTranscribeStatus("")
+		m.transcribeChan = nil
+		return m, nil
+
+	case transcribeFinishedMsg:
+		m.media = m.media.WithTranscribeStatus("")
+		m.transcribeChan = nil
 		return m, nil
 	}
 	return m, nil
@@ -173,8 +227,8 @@ func (m Model) requestAndSolveChallengeCmd() tea.Cmd {
 
 func (m Model) solvePoWCmd(challenge backend.ChallengeResponse) tea.Cmd {
 	return func() tea.Msg {
-		token, err := publish.SolvePoW(challenge.Prefix, challenge.Target)
-		return powSolvedMsg{token: token, err: err}
+		nonce, err := publish.SolvePoW(challenge.Prefix, challenge.Target)
+		return powSolvedMsg{prefix: challenge.Prefix, nonce: nonce, err: err}
 	}
 }
 
@@ -208,7 +262,7 @@ func (m Model) submitPublishCmd(token string) tea.Cmd {
 	}
 }
 
-func (m Model) handleMouse(msg tea.MouseMsg, isMotion bool) Model {
+func (m Model) handleMouse(msg tea.MouseMsg, isMotion bool) (Model, tea.Cmd) {
 	mouse := msg.Mouse()
 	x := mouse.X
 	y := mouse.Y
@@ -220,8 +274,8 @@ func (m Model) handleMouse(msg tea.MouseMsg, isMotion bool) Model {
 		if x < leftW {
 			m.focus = focusMedia
 			// Progress bar drag/click detection.
-			// Layout inside panel: border(1) + title(1) + track(1) + artist(1) + album(1) + spacing(1) + status(1) = row 7
-			progressBarAbsRow := media.ProgressBarRow + 1 // +1 for top border
+			progressBarAbsRow := media.ProgressBarRow + 1     // +1 for top border
+			transcribeAbsRow := media.TranscribeButtonRow + 1 // +1 for top border
 			if y == progressBarAbsRow {
 				if !isMotion {
 					// Direct click: seek immediately and start drag state
@@ -235,6 +289,9 @@ func (m Model) handleMouse(msg tea.MouseMsg, isMotion bool) Model {
 					innerW := leftW - 2
 					m = m.seekToMS(m.media.SeekForX(innerX, innerW))
 				}
+			} else if y == transcribeAbsRow && !isMotion {
+				m.mediaDragging = false
+				return m.startTranscription()
 			} else if !isMotion {
 				m.mediaDragging = false
 			}
@@ -276,7 +333,7 @@ func (m Model) handleMouse(msg tea.MouseMsg, isMotion bool) Model {
 	if _, isRelease := msg.(tea.MouseReleaseMsg); isRelease {
 		m.mediaDragging = false
 	}
-	return m
+	return m, nil
 }
 
 // seekToMS seeks the player to the given millisecond position and updates all panels.
@@ -294,4 +351,68 @@ func (m Model) seekToMS(newPosMS int64) Model {
 	m.waveform = m.waveform.WithPosition(snap.Position.Milliseconds())
 	m.editor = m.editor.WithPlaybackPosition(snap.Position.Milliseconds())
 	return m
+}
+
+type transcribeErrorMsg struct {
+	err error
+}
+
+type transcribeFinishedMsg struct{}
+
+func listenTranscribeCmd(ch <-chan backend.TranscribeResponse) tea.Cmd {
+	return func() tea.Msg {
+		ev, ok := <-ch
+		if !ok {
+			return transcribeFinishedMsg{}
+		}
+		return ev
+	}
+}
+
+func (m Model) startTranscription() (Model, tea.Cmd) {
+	if m.client == nil {
+		m.status = []string{"cannot transcribe: client not initialized"}
+		return m, nil
+	}
+	if m.videoID == "" {
+		m.status = []string{"cannot transcribe: no video loaded"}
+		return m, nil
+	}
+	if m.transcribeChan != nil {
+		m.status = []string{"transcription already in progress"}
+		return m, nil
+	}
+
+	m.transcribeChan = make(chan backend.TranscribeResponse, 10)
+	m.media = m.media.WithTranscribeStatus("queued")
+	m.status = []string{"transcription queued..."}
+
+	ch := m.transcribeChan
+	videoID := m.videoID
+	client := m.client
+
+	streamCmd := func() tea.Msg {
+		ctx := context.Background()
+		req := backend.TranscribeRequest{
+			VideoID:          videoID,
+			Force:            true,
+			EnableRefinement: false,
+			Mode:             "normal",
+		}
+		resp, err := client.Transcribe(ctx, req)
+		if err != nil {
+			return transcribeErrorMsg{err: err}
+		}
+
+		go func() {
+			_ = client.TranscribeStream(ctx, videoID, func(ev backend.TranscribeResponse) {
+				ch <- ev
+			})
+			close(ch)
+		}()
+
+		return resp
+	}
+
+	return m, streamCmd
 }

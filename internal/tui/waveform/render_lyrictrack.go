@@ -112,9 +112,9 @@ func (p Panel) renderLyricTrack(width int) string {
 		charStr := string(c.r)
 		if c.hasBlock {
 			if c.active {
-				b.WriteString(lyricActiveStyle.Render(charStr))
+				b.WriteString(p.theme.ActiveItem.Render(charStr))
 			} else {
-				b.WriteString(lyricInactiveStyle.Render(charStr))
+				b.WriteString(p.theme.InactiveItem.Render(charStr))
 			}
 		} else {
 			b.WriteString(charStr)

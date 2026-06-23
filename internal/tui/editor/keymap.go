@@ -265,12 +265,6 @@ func (p Panel) handleKey(key tea.KeyPressMsg) (Panel, tea.Cmd) {
 		return p.undo(), nil
 	case key.Code == 'y' && key.Mod == tea.ModCtrl:
 		return p.redo(), nil
-	case key.Code == 'p':
-		return p, func() tea.Msg {
-			return StartPublishMsg{
-				Lyrics: lyrics.FormatLRC(p.Document),
-			}
-		}
 	case key.Code == 'h' || key.Code == '?':
 		p.ShowHelp = true
 		p.helpScroll = 0

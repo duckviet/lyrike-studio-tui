@@ -3,8 +3,6 @@ package waveform
 import (
 	"fmt"
 	"strings"
-
-	"charm.land/lipgloss/v2"
 )
 
 func (p Panel) timeline(width int) string {
@@ -23,8 +21,7 @@ func (p Panel) timeline(width int) string {
 			}
 		}
 	}
-	timelineStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#555555"))
-	return timelineStyle.Render(string(cells))
+	return p.theme.Rule.Render(string(cells))
 }
 
 func formatTimelineMS(ms int64) string {

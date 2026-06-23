@@ -69,9 +69,9 @@ func (p Panel) viewLines(height int) string {
 		lineStr := fmt.Sprintf("%s%s%s |   %s", marker, playMarker, timeRange, text)
 
 		if index == activeIdx {
-			lineStr = activeLineStyle.Render(lineStr)
+			lineStr = p.theme.ActiveLine.Render(lineStr)
 		} else if index == p.selected {
-			lineStr = selectedLineStyle.Render(lineStr)
+			lineStr = p.theme.SelectedLine.Render(lineStr)
 		}
 
 		builder.WriteString(lineStr)

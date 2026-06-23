@@ -6,6 +6,7 @@ import (
 	"github.com/duckviet/lyrike-studio-tui/internal/domain/history"
 	"github.com/duckviet/lyrike-studio-tui/internal/domain/lyrics"
 	"github.com/duckviet/lyrike-studio-tui/internal/playback"
+	"github.com/duckviet/lyrike-studio-tui/internal/tui/theme"
 	"github.com/duckviet/lyrike-studio-tui/internal/tui/viewport"
 )
 
@@ -24,6 +25,7 @@ type Panel struct {
 	ShowHelp           bool
 	helpScroll         int
 	viewport           viewport.Model
+	theme              theme.Theme
 }
 
 func NewPanel(doc lyrics.Document) Panel {
@@ -33,6 +35,11 @@ func NewPanel(doc lyrics.Document) Panel {
 		manager:  history.NewManager(),
 		viewport: viewport.New(0, 10).WithTotalLines(len(doc.Lines())),
 	}
+}
+
+func (p Panel) WithTheme(t theme.Theme) Panel {
+	p.theme = t
+	return p
 }
 
 func (p Panel) Selected() int {

@@ -14,6 +14,7 @@ import (
 type State string
 
 const (
+	StateConfirm  State = "confirm"
 	StateValidate State = "validate"
 	StatePoW      State = "pow"
 	StatePublish  State = "publish"
@@ -22,12 +23,14 @@ const (
 )
 
 type Panel struct {
-	Title  string
-	state  State
-	token  string
-	err    error
-	retry  int
-	lyrics string
+	Title      string
+	state      State
+	token      string
+	err        error
+	retry      int
+	lyrics     string
+	trackName  string
+	artistName string
 }
 
 func NewPanel() Panel {
@@ -35,6 +38,19 @@ func NewPanel() Panel {
 		Title: "Publish",
 		state: StateValidate,
 	}
+}
+
+func (p Panel) WithMetadata(track, artist string) Panel {
+	p.trackName = track
+	p.artistName = artist
+	return p
+}
+
+func (p Panel) Confirm(lyrics string) Panel {
+	p.lyrics = lyrics
+	p.state = StateConfirm
+	p.err = nil
+	return p
 }
 
 func (p Panel) State() State {
@@ -99,6 +115,12 @@ func (p Panel) Retry() Panel {
 	return p
 }
 
+type ConfirmPublishMsg struct {
+	Lyrics string
+}
+
+type CancelPublishMsg struct{}
+
 type StartPublishRetryMsg struct {
 	Lyrics string
 }
@@ -107,6 +129,18 @@ func (p Panel) Update(msg tea.Msg) (Panel, tea.Cmd) {
 	key, ok := msg.(tea.KeyPressMsg)
 	if !ok {
 		return p, nil
+	}
+	if p.state == StateConfirm {
+		if key.Code == 'y' || key.Code == 'Y' {
+			return p, func() tea.Msg {
+				return ConfirmPublishMsg{Lyrics: p.lyrics}
+			}
+		}
+		if key.Code == tea.KeyEscape {
+			return p, func() tea.Msg {
+				return CancelPublishMsg{}
+			}
+		}
 	}
 	if p.state == StateFailed && key.Code == 'r' {
 		p = p.Retry()
@@ -121,6 +155,11 @@ func (p Panel) View(width, height int) string {
 	var sb strings.Builder
 	sb.WriteString("Publishing Lyrics to LRCLIB\n\n")
 	switch p.state {
+	case StateConfirm:
+		sb.WriteString("  Are you sure you want to publish lyrics?\n\n")
+		sb.WriteString(fmt.Sprintf("  Track:  %s\n", p.trackName))
+		sb.WriteString(fmt.Sprintf("  Artist: %s\n\n", p.artistName))
+		sb.WriteString("  Press 'y' to confirm and publish, or Esc to cancel.")
 	case StateValidate:
 		sb.WriteString("  [ ] Validating lyrics...\n")
 	case StatePoW:

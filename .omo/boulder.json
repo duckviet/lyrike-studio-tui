@@ -1,6 +1,6 @@
 {
   "schema_version": 2,
-  "active_work_id": "tui-fetch-input-ulw",
+  "active_work_id": "ku-ui-integration",
   "works": {
     "lyrike-studio-tui-ulw": {
       "work_id": "lyrike-studio-tui-ulw",
@@ -24,6 +24,14 @@
       "plan_name": "tui-fetch-input",
       "session_ids": ["codex:tui-fetch-input-impl"],
       "status": "completed",
+      "worktree_path": null
+    },
+    "ku-ui-integration": {
+      "work_id": "ku-ui-integration",
+      "active_plan": ".omo/plans/ku-ui-integration.md",
+      "plan_name": "ku-ui-integration",
+      "session_ids": ["codex:ku-ui-integration-impl"],
+      "status": "active",
       "worktree_path": null
     }
   }

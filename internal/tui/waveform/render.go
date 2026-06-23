@@ -116,7 +116,7 @@ func (p Panel) View(width int, height int) string {
 			cellStr := string(glyph)
 			if glyph != ' ' {
 				if isHover {
-					cellStr = cursorStyle.Render(cellStr)
+					cellStr = p.theme.Knob.Render(cellStr)
 				} else {
 					cellStr = style.Render(cellStr)
 				}
@@ -193,7 +193,7 @@ func (p Panel) viewSingleRow(width int) string {
 
 		cellStr := string(glyph)
 		if isHover {
-			cellStr = cursorStyle.Render(cellStr)
+			cellStr = p.theme.Knob.Render(cellStr)
 		} else {
 			style := lipgloss.NewStyle().Foreground(lipgloss.Color(colColor))
 			cellStr = style.Render(cellStr)

@@ -2,8 +2,6 @@ package editor
 
 import (
 	"strings"
-
-	"charm.land/lipgloss/v2"
 )
 
 func (p Panel) viewImporting() string {
@@ -19,8 +17,7 @@ func (p Panel) viewImporting() string {
 	builder.WriteString("> " + pathStr + "\n\n")
 
 	if p.lastErr != nil {
-		errStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#FF3366"))
-		builder.WriteString(errStyle.Render("Error: "+p.lastErr.Error()) + "\n\n")
+		builder.WriteString(p.theme.ErrorText.Render("Error: "+p.lastErr.Error()) + "\n\n")
 	}
 
 	builder.WriteString("(Press Enter to import, Esc to cancel)")

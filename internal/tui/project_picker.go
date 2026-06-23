@@ -2,10 +2,10 @@ package tui
 
 import (
 	"fmt"
+	"io"
 	"strings"
 
 	tea "charm.land/bubbletea/v2"
-	"charm.land/lipgloss/v2"
 
 	"github.com/duckviet/lyrike-studio-tui/internal/domain/draft"
 	"github.com/duckviet/lyrike-studio-tui/internal/tui/editor"
@@ -58,15 +58,15 @@ func (m Model) updateProjectPicker(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 	msg = normalizeKeyPress(msg)
 	switch m.picker.mode {
 	case projectPickerChoose:
-		return m.updateProjectPickerChoose(msg), nil
+		return m.updateProjectPickerChoose(msg)
 	case projectPickerConfirmLoad:
-		return m.updateProjectPickerConfirm(msg), nil
+		return m.updateProjectPickerConfirm(msg)
 	default:
 		return m, nil
 	}
 }
 
-func (m Model) updateProjectPickerChoose(msg tea.KeyPressMsg) Model {
+func (m Model) updateProjectPickerChoose(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 	switch {
 	case msg.Code == tea.KeyEscape:
 		m.picker = projectPicker{}
@@ -82,37 +82,37 @@ func (m Model) updateProjectPickerChoose(msg tea.KeyPressMsg) Model {
 		m.picker.selected = max(0, m.picker.selected-1)
 	case msg.Code == tea.KeyEnter:
 		if len(m.picker.projects) == 0 {
-			return m
+			return m, nil
 		}
 		selected := m.picker.projects[m.picker.selected].ID
 		if m.dirty && selected != m.projectID {
 			m.picker.mode = projectPickerConfirmLoad
 			m.picker.target = selected
 			m.status = []string{"unsaved changes: Enter confirms project load"}
-			return m
+			return m, nil
 		}
-		m = m.loadProject(selected)
+		return m.loadProject(selected)
 	}
-	return m
+	return m, nil
 }
 
-func (m Model) updateProjectPickerConfirm(msg tea.KeyPressMsg) Model {
+func (m Model) updateProjectPickerConfirm(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 	switch msg.Code {
 	case tea.KeyEscape:
 		m.picker.mode = projectPickerChoose
 		m.picker.target = ""
 		m.status = []string{"project load canceled"}
 	case tea.KeyEnter:
-		m = m.loadProject(m.picker.target)
+		return m.loadProject(m.picker.target)
 	}
-	return m
+	return m, nil
 }
 
-func (m Model) loadProject(id draft.ProjectID) Model {
+func (m Model) loadProject(id draft.ProjectID) (Model, tea.Cmd) {
 	snapshot, err := m.draftStore.Load(id)
 	if err != nil {
 		m.status = []string{"project load failed: " + err.Error()}
-		return m
+		return m, nil
 	}
 	m.projectID = snapshot.ProjectID
 	m.videoID = snapshot.Metadata.VideoID
@@ -120,15 +120,33 @@ func (m Model) loadProject(id draft.ProjectID) Model {
 	m.artistName = snapshot.Metadata.ArtistName
 	m.albumName = snapshot.Metadata.AlbumName
 	m.media = m.media.WithMetadata(m.trackName, m.artistName, m.albumName)
-	m.editor = editor.NewPanel(snapshot.Document)
+	m.editor = editor.NewPanel(snapshot.Document).WithTheme(m.theme)
 	m.picker = projectPicker{}
 	m.dirty = false
 	m.focus = focusEditor
-	m.status = []string{"project loaded: " + id.String()}
-	return m
+
+	if m.playerFactory != nil && m.videoID != "" {
+		if closer, ok := m.player.(io.Closer); ok {
+			_ = closer.Close()
+		}
+		newPlayer, status := m.playerFactory(m.videoID)
+		m.player = newPlayer
+		if status != "" {
+			m.status = []string{"project loaded: " + id.String() + " | " + status}
+		} else {
+			m.status = []string{"project loaded: " + id.String()}
+		}
+	} else {
+		m.status = []string{"project loaded: " + id.String()}
+	}
+
+	if m.client != nil && (m.videoID != "" || m.sourceURL != "") {
+		return m, m.fetchCmd(m.videoID, m.sourceURL)
+	}
+	return m, nil
 }
 
-func renderProjectPicker(p projectPicker, width int, height int) string {
+func renderProjectPicker(p projectPicker, width int, height int, th Theme) string {
 	var builder strings.Builder
 	builder.WriteString("Projects\n")
 	switch p.mode {
@@ -157,8 +175,8 @@ func renderProjectPicker(p projectPicker, width int, height int) string {
 		builder.WriteString("Enter: load | n: new from URL | Esc: cancel")
 	}
 	content := "Project Picker\n" + builder.String()
-	return focusedBorder.
+	return th.PaneActive.
 		Width(max(0, width-2)).
 		Height(max(0, height-2)).
-		Render(lipgloss.NewStyle().Width(max(0, width-4)).Render(content))
+		Render(th.Text.Width(max(0, width-4)).Render(content))
 }

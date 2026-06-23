@@ -8,7 +8,6 @@ import (
 	"strings"
 
 	"charm.land/bubbletea/v2"
-	"charm.land/lipgloss/v2"
 
 	"github.com/duckviet/lyrike-studio-tui/internal/domain/draft"
 	"github.com/duckviet/lyrike-studio-tui/internal/domain/lyrics"
@@ -95,7 +94,7 @@ func parseVideoIDInput(raw string) (videoID, sourceURL string, ok bool) {
 	return "", "", false
 }
 
-func renderFetchInput(f fetchInput, width int, height int) string {
+func renderFetchInput(f fetchInput, width int, height int, th Theme) string {
 	var content strings.Builder
 	content.WriteString("Fetch Media\n")
 
@@ -116,10 +115,10 @@ func renderFetchInput(f fetchInput, width int, height int) string {
 		content.WriteString("\nEnter: fetch | Esc: cancel")
 	}
 
-	return focusedBorder.
+	return th.PaneActive.
 		Width(max(0, width-2)).
 		Height(max(0, height-2)).
-		Render(lipgloss.NewStyle().Width(max(0, width-4)).Render(content.String()))
+		Render(th.Text.Width(max(0, width-4)).Render(content.String()))
 }
 
 // newDefaultDocument returns a one-line placeholder document used when
@@ -190,16 +189,14 @@ func (m Model) applyFetch(videoID, sourceURL string) (tea.Model, tea.Cmd) {
 
 	snapshot, err := m.draftStore.Load(pid)
 	if err == nil && snapshot.ProjectID != "" {
-		m = m.loadProject(pid)
-		if sourceURL != "" {
-			m.sourceURL = sourceURL
-		}
+		m.sourceURL = sourceURL
+		m, cmd := m.loadProject(pid)
 		m.fetchInput = fetchInput{}
 		if m.client == nil {
 			m.status = []string{"backend unavailable"}
 			return m, nil
 		}
-		return m, m.fetchCmd(videoID, sourceURL)
+		return m, cmd
 	}
 
 	if !isNotFoundError(err) {
@@ -214,8 +211,8 @@ func (m Model) applyFetch(videoID, sourceURL string) (tea.Model, tea.Cmd) {
 	m.trackName = ""
 	m.artistName = ""
 	m.albumName = ""
-	m.editor = editor.NewPanel(newDefaultDocument())
-	m.media = media.NewPanel()
+	m.editor = editor.NewPanel(newDefaultDocument()).WithTheme(m.theme)
+	m.media = media.NewPanel().WithTheme(m.theme)
 	m.dirty = true
 	m.fetchInput = fetchInput{}
 	m.status = []string{"new project: " + pid.String()}

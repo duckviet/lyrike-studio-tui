@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/duckviet/lyrike-studio-tui/internal/domain/lyrics"
+	"github.com/duckviet/lyrike-studio-tui/internal/tui/theme"
 )
 
 var ansiRegexp = regexp.MustCompile(`\x1b\[[0-9;]*[a-zA-Z]`)
@@ -67,7 +68,8 @@ func TestWaveformRenderLyricTrack(t *testing.T) {
 
 	panel := NewPanelWithPeaks([]float64{0.5}, 10_000).
 		WithLines([]lyrics.Line{line}).
-		WithPosition(5000)
+		WithPosition(5000).
+		WithTheme(theme.DefaultTheme())
 
 	gotRaw := panel.renderLyricTrack(11)
 	got := stripAnsi(gotRaw)

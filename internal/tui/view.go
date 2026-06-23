@@ -11,16 +11,6 @@ import (
 	"github.com/duckviet/lyrike-studio-tui/internal/tui/waveform"
 )
 
-var (
-	focusedBorder = lipgloss.NewStyle().
-			Border(lipgloss.RoundedBorder()).
-			BorderForeground(lipgloss.Color("#7D56F4"))
-
-	normalBorder = lipgloss.NewStyle().
-			Border(lipgloss.RoundedBorder()).
-			BorderForeground(lipgloss.Color("#555555"))
-)
-
 func calculateLayout(width, height int, statusLen int) (topHeight, wfHeight, leftW, rightW, availableHeight int) {
 	availableHeight = height
 	if statusLen > 0 {
@@ -49,29 +39,27 @@ func renderLayout(m Model) string {
 		return "Loading..."
 	}
 	if m.fetchInput.active() {
-		return renderFetchInput(m.fetchInput, m.width, m.height)
+		return renderFetchInput(m.fetchInput, m.width, m.height, m.theme)
 	}
 	if m.picker.active() {
-		return renderProjectPicker(m.picker, m.width, m.height)
+		return renderProjectPicker(m.picker, m.width, m.height, m.theme)
 	}
 
 	topHeight, wfHeight, leftW, rightW, _ := calculateLayout(m.width, m.height, len(m.status))
 
 	var left string
-	if m.metadataEditor.active {
-		left = renderMetadataEditor(m.metadataEditor, leftW, topHeight)
+	if m.focus == focusPublish {
+		left = renderPublishPanel(m.publish, leftW, topHeight, true, m.theme)
+	} else if m.metadataEditor.active {
+		left = renderMetadataEditor(m.metadataEditor, leftW, topHeight, m.theme)
 	} else {
-		left = renderMediaPanel(m.media, leftW, topHeight, m.focus == focusMedia)
+		left = renderMediaPanel(m.media, leftW, topHeight, m.focus == focusMedia, m.theme)
 	}
 
 	var right string
-	if m.focus == focusPublish {
-		right = renderPublishPanel(m.publish, rightW, topHeight, true)
-	} else {
-		right = renderLyricsPanel(m.editor, rightW, topHeight, m.focus == focusEditor)
-	}
+	right = renderLyricsPanel(m.editor, rightW, topHeight, m.focus == focusEditor, m.theme)
 
-	bottom := renderWaveformPanel(m.waveform.WithLines(m.editor.Document.Lines()), m.width, wfHeight, m.focus == focusWaveform)
+	bottom := renderWaveformPanel(m.waveform.WithLines(m.editor.Document.Lines()), m.width, wfHeight, m.focus == focusWaveform, m.theme)
 
 	topRow := lipgloss.JoinHorizontal(lipgloss.Top, left, right)
 	layout := lipgloss.JoinVertical(lipgloss.Left, topRow, bottom)
@@ -83,10 +71,10 @@ func renderLayout(m Model) string {
 	return layout + "\n" + strings.Join(status, " | ")
 }
 
-func renderMediaPanel(p media.Panel, width, height int, focused bool) string {
-	style := normalBorder
+func renderMediaPanel(p media.Panel, width, height int, focused bool, th Theme) string {
+	style := th.PaneInactive
 	if focused {
-		style = focusedBorder
+		style = th.PaneActive
 	}
 
 	contentHeight := height - 2
@@ -96,10 +84,10 @@ func renderMediaPanel(p media.Panel, width, height int, focused bool) string {
 	return renderBox(style, width, rows)
 }
 
-func renderWaveformPanel(p waveform.Panel, width, height int, focused bool) string {
-	style := normalBorder
+func renderWaveformPanel(p waveform.Panel, width, height int, focused bool, th Theme) string {
+	style := th.PaneInactive
 	if focused {
-		style = focusedBorder
+		style = th.PaneActive
 	}
 
 	contentHeight := height - 2
@@ -109,10 +97,10 @@ func renderWaveformPanel(p waveform.Panel, width, height int, focused bool) stri
 	return renderBox(style, width, rows)
 }
 
-func renderLyricsPanel(p editor.Panel, width, height int, focused bool) string {
-	style := normalBorder
+func renderLyricsPanel(p editor.Panel, width, height int, focused bool, th Theme) string {
+	style := th.PaneInactive
 	if focused {
-		style = focusedBorder
+		style = th.PaneActive
 	}
 
 	contentHeight := height - 2
@@ -123,10 +111,10 @@ func renderLyricsPanel(p editor.Panel, width, height int, focused bool) string {
 	return renderBox(style, width, rows)
 }
 
-func renderPublishPanel(p publish.Panel, width, height int, focused bool) string {
-	style := normalBorder
+func renderPublishPanel(p publish.Panel, width, height int, focused bool, th Theme) string {
+	style := th.PaneInactive
 	if focused {
-		style = focusedBorder
+		style = th.PaneActive
 	}
 
 	contentHeight := height - 2

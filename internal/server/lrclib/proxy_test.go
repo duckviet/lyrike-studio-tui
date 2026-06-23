@@ -74,6 +74,9 @@ func TestPublishProxy(t *testing.T) {
 		if got := r.Header.Get("X-Publish-Token"); got != wantToken {
 			t.Errorf("expected X-Publish-Token %q, got %q", wantToken, got)
 		}
+		if got := r.Header.Get("Content-Type"); got != "application/json" {
+			t.Errorf("expected Content-Type application/json, got %q", got)
+		}
 
 		gotBody, err := io.ReadAll(r.Body)
 		if err != nil {

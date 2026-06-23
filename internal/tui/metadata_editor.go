@@ -4,7 +4,6 @@ import (
 	"strings"
 
 	tea "charm.land/bubbletea/v2"
-	"charm.land/lipgloss/v2"
 )
 
 type metadataEditor struct {
@@ -112,14 +111,14 @@ func (m Model) updateMetadataEditor(msg tea.Msg) (Model, tea.Cmd) {
 	return m, nil
 }
 
-func renderMetadataEditor(me metadataEditor, width, height int) string {
+func renderMetadataEditor(me metadataEditor, width, height int, th Theme) string {
 	innerW := max(0, width-4) // account for border (2) + padding (2)
 
-	titleStyle := lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("#7D56F4"))
-	labelStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#888888"))
-	activeStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#FF3366"))
-	valueStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#DDDDDD"))
-	hintStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#555555"))
+	titleStyle := th.Title
+	labelStyle := th.Dim
+	activeStyle := th.Prompt
+	valueStyle := th.Value
+	hintStyle := th.Dim
 
 	type field struct {
 		label string
@@ -161,8 +160,8 @@ func renderMetadataEditor(me metadataEditor, width, height int) string {
 	lines = append(lines, hintStyle.Render("Enter: save  Esc: cancel"))
 
 	content := strings.Join(lines, "\n")
-	return focusedBorder.
+	return th.PaneActive.
 		Width(max(0, width-2)).
 		Height(max(0, height-2)).
-		Render(lipgloss.NewStyle().Width(innerW).Render(content))
+		Render(th.Value.Width(innerW).Render(content))
 }

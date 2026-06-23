@@ -2,6 +2,7 @@ package tui
 
 import (
 	"context"
+	"io"
 	"time"
 
 	tea "charm.land/bubbletea/v2"
@@ -27,11 +28,16 @@ const (
 	focusPublish
 )
 
+// PlayerFactory creates a playback.Player for the given video ID and returns
+// the player plus a status message describing how it was initialized.
+type PlayerFactory func(videoID string) (playback.Player, string)
+
 // Model is the root Bubble Tea model for the three-panel shell.
 type Model struct {
 	width      int
 	height     int
 	focus      focus
+	theme      Theme
 	media      media.Panel
 	waveform   waveform.Panel
 	editor     editor.Panel
@@ -45,6 +51,7 @@ type Model struct {
 
 	client         *backend.Client
 	player         playback.Player
+	playerFactory  PlayerFactory
 	draftStore     storage.Store
 	projectID      draft.ProjectID
 	videoID        string
@@ -53,6 +60,7 @@ type Model struct {
 	artistName     string
 	albumName      string
 	metadataEditor metadataEditor
+	transcribeChan chan backend.TranscribeResponse
 }
 
 // NewModel builds a shell model with the given panels.
@@ -62,11 +70,13 @@ func NewModel(doc lyrics.Document, client *backend.Client, player playback.Playe
 }
 
 func NewModelWithDraftStore(doc lyrics.Document, client *backend.Client, player playback.Player, store storage.Store, projectID draft.ProjectID, videoID string, sourceURL string) Model {
+	th := DefaultTheme()
 	return Model{
 		focus:      focusMedia,
-		media:      media.NewPanel(),
-		waveform:   waveform.NewPanel(),
-		editor:     editor.NewPanel(doc),
+		theme:      th,
+		media:      media.NewPanel().WithTheme(th),
+		waveform:   waveform.NewPanel().WithTheme(th),
+		editor:     editor.NewPanel(doc).WithTheme(th),
 		publish:    publish.NewPanel(),
 		client:     client,
 		player:     player,
@@ -82,9 +92,29 @@ func (m Model) WithPublish(panel publish.Panel) Model {
 	return m
 }
 
+func (m Model) WithPlayerFactory(factory PlayerFactory) Model {
+	m.playerFactory = factory
+	return m
+}
+
 func (m Model) WithStatus(lines []string) Model {
 	m.status = append([]string(nil), lines...)
 	return m
+}
+
+func (m Model) WithTheme(th Theme) Model {
+	m.theme = th
+	m.media = m.media.WithTheme(th)
+	m.waveform = m.waveform.WithTheme(th)
+	m.editor = m.editor.WithTheme(th)
+	return m
+}
+
+func (m Model) Close() error {
+	if closer, ok := m.player.(io.Closer); ok {
+		return closer.Close()
+	}
+	return nil
 }
 
 type fetchMediaMsg struct {
@@ -138,8 +168,9 @@ type challengeMsg struct {
 }
 
 type powSolvedMsg struct {
-	token string
-	err   error
+	prefix string
+	nonce  string
+	err    error
 }
 
 type publishResultMsg struct {

@@ -87,6 +87,9 @@ func runDemo(backendFixture bool) error {
 	if err != nil {
 		return err
 	}
+	if m, ok := model.(tui.Model); ok {
+		model = m.WithTheme(tui.DefaultTheme())
+	}
 	_, err = tea.NewProgram(model).Run()
 	return err
 }
@@ -120,12 +123,9 @@ func runServe(args []string) error {
 	return http.ListenAndServe(fmt.Sprintf(":%d", cfg.Port), srv.Handler())
 }
 
-func runReal(backendURL, mpvSocket, videoID, projectIDValue, sourceURL, audioPath, importPath string) error {
-	client := backend.NewClient(backendURL)
-
+func newPlayer(backendURL, mpvSocket, audioPath, videoID string) (playback.Player, *mpv.Player, string) {
 	var player playback.Player
 	var mpvPlayer *mpv.Player
-
 	var statusMsg string
 
 	// 1. Try native beep player first if audio file or backend audio URL is available
@@ -152,6 +152,13 @@ func runReal(backendURL, mpvSocket, videoID, projectIDValue, sourceURL, audioPat
 		if err := mpvPlayer.Start(ctx); err == nil {
 			player = mpvPlayer
 			statusMsg = "connected to mpv via " + mpvSocket
+		} else {
+			if statusMsg != "" {
+				statusMsg += " | "
+			}
+			statusMsg += fmt.Sprintf("mpv connection failed: %v", err)
+			_ = mpvPlayer.Close()
+			mpvPlayer = nil
 		}
 	}
 
@@ -164,6 +171,19 @@ func runReal(backendURL, mpvSocket, videoID, projectIDValue, sourceURL, audioPat
 		} else {
 			statusMsg += " | falling back to fake player"
 		}
+	}
+
+	return player, mpvPlayer, statusMsg
+}
+
+func runReal(backendURL, mpvSocket, videoID, projectIDValue, sourceURL, audioPath, importPath string) error {
+	client := backend.NewClient(backendURL)
+
+	player, mpvPlayer, statusMsg := newPlayer(backendURL, mpvSocket, audioPath, videoID)
+
+	playerFactory := func(vid string) (playback.Player, string) {
+		p, _, s := newPlayer(backendURL, mpvSocket, "", vid)
+		return p, s
 	}
 
 	// Try loading draft or imported lyrics
@@ -206,7 +226,9 @@ func runReal(backendURL, mpvSocket, videoID, projectIDValue, sourceURL, audioPat
 		}
 	}
 
-	model := tui.NewModelWithDraftStore(doc, client, player, store, projectID, videoID, sourceURL)
+	model := tui.NewModelWithDraftStore(doc, client, player, store, projectID, videoID, sourceURL).
+		WithPlayerFactory(playerFactory).
+		WithTheme(tui.DefaultTheme())
 	if projectID != "" && loadedSnapshotErr == nil {
 		model = model.WithProjectMetadata(loadedSnapshot.Metadata.TrackName, loadedSnapshot.Metadata.ArtistName, loadedSnapshot.Metadata.AlbumName)
 	}
@@ -217,14 +239,17 @@ func runReal(backendURL, mpvSocket, videoID, projectIDValue, sourceURL, audioPat
 		model = model.WithStatus([]string{statusMsg})
 	}
 
-	_, err := tea.NewProgram(model).Run()
+	finalModel, err := tea.NewProgram(model).Run()
 
-	// Clean up player and mpv connection
-	if closer, ok := player.(io.Closer); ok {
-		_ = closer.Close()
-	}
-	if mpvPlayer != nil {
-		_ = mpvPlayer.Close()
+	if m, ok := finalModel.(tui.Model); ok {
+		_ = m.Close()
+	} else {
+		if closer, ok := player.(io.Closer); ok {
+			_ = closer.Close()
+		}
+		if mpvPlayer != nil {
+			_ = mpvPlayer.Close()
+		}
 	}
 	return err
 }

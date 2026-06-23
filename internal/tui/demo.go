@@ -29,7 +29,7 @@ func DemoModel() (Model, error) {
 	for i := range peaks {
 		peaks[i] = 0.2 + 0.7*math.Sin(float64(i)*0.15)*math.Sin(float64(i)*0.15)
 	}
-	m.waveform = waveform.NewPanelWithPeaks(peaks, 212000)
+	m.waveform = waveform.NewPanelWithPeaks(peaks, 212000).WithTheme(m.theme)
 	return m, nil
 }
 
@@ -55,7 +55,7 @@ func DemoFixtureModel(baseURL string) (Model, error) {
 	for i := range peaks {
 		peaks[i] = 0.2 + 0.7*math.Sin(float64(i)*0.15)*math.Sin(float64(i)*0.15)
 	}
-	m.waveform = waveform.NewPanelWithPeaks(peaks, 212000)
+	m.waveform = waveform.NewPanelWithPeaks(peaks, 212000).WithTheme(m.theme)
 	return m, nil
 }
 
