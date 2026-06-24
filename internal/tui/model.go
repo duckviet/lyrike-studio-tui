@@ -82,6 +82,10 @@ func NewModelWithDraftStore(doc lyrics.Document, client *backend.Client, player 
 	ti.Prompt = th.Prompt.Render("❯ ")
 	styles := ti.Styles()
 	styles.Cursor.Blink = false
+	styles.Focused.Text = styles.Focused.Text.Background(th.P.Surface2)
+	styles.Focused.Placeholder = styles.Focused.Placeholder.Background(th.P.Surface2)
+	styles.Blurred.Text = styles.Blurred.Text.Background(th.P.Surface2)
+	styles.Blurred.Placeholder = styles.Blurred.Placeholder.Background(th.P.Surface2)
 	ti.SetStyles(styles)
 
 	return Model{

@@ -2,6 +2,7 @@ package theme
 
 import (
 	"image/color"
+	"strings"
 
 	"charm.land/lipgloss/v2"
 )
@@ -116,11 +117,11 @@ func NewTheme(name string, p Palette) Theme {
 		Padding(1, 2).
 		Border(lipgloss.ThickBorder(), false, false, false, true). // left-only
 		BorderForeground(p.Accent)
-	t.ModalTitle = lipgloss.NewStyle().Foreground(p.Accent).Bold(true)
-	t.Prompt = lipgloss.NewStyle().Foreground(p.Accent2).Bold(true)
-	t.SelItem = lipgloss.NewStyle().Foreground(p.Fg)
+	t.ModalTitle = lipgloss.NewStyle().Foreground(p.Accent).Bold(true).Background(p.Surface2)
+	t.Prompt = lipgloss.NewStyle().Foreground(p.Accent2).Bold(true).Background(p.Surface2)
+	t.SelItem = lipgloss.NewStyle().Foreground(p.Fg).Background(p.Surface2)
 	t.SelItemSel = lipgloss.NewStyle().Foreground(p.SelFg).Background(p.SelBg).Bold(true)
-	t.SelDesc = lipgloss.NewStyle().Foreground(p.Muted)
+	t.SelDesc = lipgloss.NewStyle().Foreground(p.Muted).Background(p.Surface2)
 
 	// ── Panes ────────────────────────────────────────────────────────────────
 	t.PaneActive = lipgloss.NewStyle().
@@ -135,37 +136,77 @@ func NewTheme(name string, p Palette) Theme {
 		Background(p.Surface).
 		Padding(PanePaddingY, PanePaddingX)
 
-	t.Rule = lipgloss.NewStyle().Foreground(p.Subdued)
+	t.Rule = lipgloss.NewStyle().Foreground(p.Subdued).Background(p.Surface)
 
-	t.PaneTitleActive = lipgloss.NewStyle().Foreground(p.Accent).Bold(true)
-	t.PaneTitleInactive = lipgloss.NewStyle().Foreground(p.Muted)
+	t.PaneTitleActive = lipgloss.NewStyle().Foreground(p.Accent).Bold(true).Background(p.Surface)
+	t.PaneTitleInactive = lipgloss.NewStyle().Foreground(p.Muted).Background(p.Surface)
 
 	// ── Semantic ─────────────────────────────────────────────────────────────
-	t.Good = lipgloss.NewStyle().Foreground(p.Good)
-	t.Warn = lipgloss.NewStyle().Foreground(p.Warn)
-	t.Bad = lipgloss.NewStyle().Foreground(p.Bad)
-	t.Dim = lipgloss.NewStyle().Foreground(p.Muted)
+	t.Good = lipgloss.NewStyle().Foreground(p.Good).Background(p.Surface)
+	t.Warn = lipgloss.NewStyle().Foreground(p.Warn).Background(p.Surface)
+	t.Bad = lipgloss.NewStyle().Foreground(p.Bad).Background(p.Surface)
+	t.Dim = lipgloss.NewStyle().Foreground(p.Muted).Background(p.Surface)
 
 	// ── Text roles ───────────────────────────────────────────────────────────
-	t.Title = lipgloss.NewStyle().Foreground(p.Accent).Bold(true)
-	t.Subtitle = lipgloss.NewStyle().Foreground(p.Subdued).Italic(true)
-	t.Text = lipgloss.NewStyle().Foreground(p.Fg)
-	t.Status = lipgloss.NewStyle().Foreground(p.Accent2)
-	t.Key = lipgloss.NewStyle().Foreground(p.Accent)
-	t.Desc = lipgloss.NewStyle().Foreground(p.Subdued)
+	t.Title = lipgloss.NewStyle().Foreground(p.Accent).Bold(true).Background(p.Surface)
+	t.Subtitle = lipgloss.NewStyle().Foreground(p.Subdued).Italic(true).Background(p.Surface)
+	t.Text = lipgloss.NewStyle().Foreground(p.Fg).Background(p.Surface)
+	t.Status = lipgloss.NewStyle().Foreground(p.Accent2).Background(p.Surface)
+	t.Key = lipgloss.NewStyle().Foreground(p.Accent).Background(p.Surface)
+	t.Desc = lipgloss.NewStyle().Foreground(p.Subdued).Background(p.Surface)
 	t.Button = lipgloss.NewStyle().Background(p.Accent).Foreground(p.SelFg).Bold(true)
-	t.Played = lipgloss.NewStyle().Foreground(p.Accent)
-	t.Unplayed = lipgloss.NewStyle().Foreground(p.Unplayed)
-	t.Knob = lipgloss.NewStyle().Foreground(p.Accent2)
-	t.ActiveLine = lipgloss.NewStyle().Foreground(p.Accent).Bold(true)
-	t.SelectedLine = lipgloss.NewStyle().Foreground(p.Accent2)
+	t.Played = lipgloss.NewStyle().Foreground(p.Accent).Background(p.Surface)
+	t.Unplayed = lipgloss.NewStyle().Foreground(p.Unplayed).Background(p.Surface)
+	t.Knob = lipgloss.NewStyle().Foreground(p.Accent2).Background(p.Surface)
+	t.ActiveLine = lipgloss.NewStyle().Foreground(p.Accent).Bold(true).Background(p.Surface)
+	t.SelectedLine = lipgloss.NewStyle().Foreground(p.Accent2).Background(p.Surface)
 	t.ActiveItem = lipgloss.NewStyle().Background(p.Accent).Foreground(p.SelFg).Bold(true)
 	t.InactiveItem = lipgloss.NewStyle().Background(p.Surface).Foreground(p.Muted)
-	t.ErrorText = lipgloss.NewStyle().Foreground(p.Bad)
-	t.Value = lipgloss.NewStyle().Foreground(p.SelFg)
-	t.Hint = lipgloss.NewStyle().Foreground(p.Muted)
+	t.ErrorText = lipgloss.NewStyle().Foreground(p.Bad).Background(p.Surface)
+	t.Value = lipgloss.NewStyle().Foreground(p.SelFg).Background(p.Surface)
+	t.Hint = lipgloss.NewStyle().Foreground(p.Muted).Background(p.Surface)
 
 	return t
+}
+
+// Modal returns the style s with its background set to the modal surface color.
+func (t Theme) Modal(s lipgloss.Style) lipgloss.Style {
+	return s.Background(t.P.Surface2)
+}
+
+// PaintModal wraps a string so that its background matches the modal surface.
+func (t Theme) PaintModal(s string) string {
+	return PaintBackground(s, t.P.Surface2)
+}
+
+// PaintPane wraps a string so that its background matches the pane surface.
+func (t Theme) PaintPane(s string) string {
+	return PaintBackground(s, t.P.Surface)
+}
+
+// PaintBackground ensures that any style reset within the rendered string
+// immediately re-asserts the theme's background color, preventing unstyled
+// segments/spaces from falling back to default black.
+func PaintBackground(s string, bg color.Color) string {
+	if bg == nil {
+		return s
+	}
+	res := lipgloss.NewStyle().Background(bg).Render(" ")
+	if len(res) <= 4 {
+		return s
+	}
+	var bgSeq string
+	if strings.HasSuffix(res, "\x1b[m") {
+		bgSeq = res[:len(res)-4]
+	} else if strings.HasSuffix(res, "\x1b[0m") {
+		bgSeq = res[:len(res)-5]
+	} else {
+		return s
+	}
+
+	s = strings.ReplaceAll(s, "\x1b[m", "\x1b[m"+bgSeq)
+	s = strings.ReplaceAll(s, "\x1b[0m", "\x1b[0m"+bgSeq)
+	return bgSeq + s + "\x1b[m"
 }
 
 // DefaultTheme returns the built-in lyrike-studio-tui theme.

@@ -42,7 +42,12 @@ func main() {
 	demoRequested := flag.Bool("demo", false, "launch the TUI demo")
 	backendFixtureRequested := flag.Bool("backend-fixture", false, "use deterministic backend fixture data in demo mode")
 
-	backendURL := flag.String("backend", "http://127.0.0.1:8000", "URL of the FastAPI backend")
+	defaultBackend := os.Getenv("BACKEND_URL")
+
+	if defaultBackend == "" {
+		defaultBackend = "http://127.0.0.1:8000"
+	}
+	backendURL := flag.String("backend", defaultBackend, "URL of the FastAPI backend")
 	mpvSocket := flag.String("mpv-socket", "/tmp/lyrike-mpv.sock", "Path to the mpv IPC socket")
 	videoID := flag.String("video-id", "", "YouTube video ID to sync")
 	projectID := flag.String("project", "", "project ID for draft save/load")

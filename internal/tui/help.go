@@ -101,17 +101,21 @@ func (h helpView) View(width, height int) string {
 	}
 
 	blocks := make([]string, len(groups))
+	keyStyle := h.th.Modal(h.th.FooterKey)
+	descStyle := h.th.Modal(h.th.FooterDesc)
+	blockStyle := h.th.Modal(lipgloss.NewStyle().Width(colW))
+
 	for i, g := range groups {
 		var b strings.Builder
 		b.WriteString(h.th.Prompt.Render(g.title))
 		b.WriteString("\n")
 		for _, k := range g.keys {
-			b.WriteString(h.th.FooterKey.Render(fmt.Sprintf("%-8s", k[0])))
+			b.WriteString(keyStyle.Render(fmt.Sprintf("%-8s", k[0])))
 			b.WriteString(" ")
-			b.WriteString(h.th.FooterDesc.Render(k[1]))
+			b.WriteString(descStyle.Render(k[1]))
 			b.WriteString("\n")
 		}
-		blocks[i] = lipgloss.NewStyle().Width(colW).Render(strings.TrimRight(b.String(), "\n"))
+		blocks[i] = blockStyle.Render(strings.TrimRight(b.String(), "\n"))
 	}
 
 	perRow := 3
@@ -160,12 +164,13 @@ func (h helpView) View(width, height int) string {
 	grid = strings.Join(gridLines[h.offset:end], "\n")
 
 	title := h.th.ModalTitle.Render("Keybindings")
-	hint := h.th.Dim.Render("  ? or esc to close")
+	hintStyle := h.th.Modal(h.th.Dim)
+	hint := hintStyle.Render("  ? or esc to close")
 	if maxOffset > 0 {
-		hint = h.th.Dim.Render(fmt.Sprintf("  ↑↓ scroll %d/%d · esc close", h.offset+1, maxOffset+1))
+		hint = hintStyle.Render(fmt.Sprintf("  ↑↓ scroll %d/%d · esc close", h.offset+1, maxOffset+1))
 	}
 	content := title + hint + spacer + grid
 
-	box := border.Render(content)
+	box := border.Render(h.th.PaintModal(content))
 	return box
 }

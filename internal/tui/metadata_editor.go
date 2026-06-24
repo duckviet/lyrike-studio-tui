@@ -123,11 +123,11 @@ func renderMetadataEditor(me metadataEditor, width, height int, th Theme) string
 		boxWidth = width
 	}
 
-	titleStyle := th.Title
-	labelStyle := th.Dim
+	titleStyle := th.Modal(th.Title)
+	labelStyle := th.Modal(th.Dim)
 	activeStyle := th.Prompt
-	valueStyle := th.Value
-	hintStyle := th.Dim
+	valueStyle := th.Modal(th.Value)
+	hintStyle := th.Modal(th.Dim)
 
 	type field struct {
 		label string

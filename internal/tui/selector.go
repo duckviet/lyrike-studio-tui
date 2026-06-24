@@ -68,6 +68,10 @@ func newSelector(th Theme) selector {
 	ti.Prompt = th.Prompt.Render("❯ ")
 	styles := ti.Styles()
 	styles.Cursor.Blink = false
+	styles.Focused.Text = styles.Focused.Text.Background(th.P.Surface2)
+	styles.Focused.Placeholder = styles.Focused.Placeholder.Background(th.P.Surface2)
+	styles.Blurred.Text = styles.Blurred.Text.Background(th.P.Surface2)
+	styles.Blurred.Placeholder = styles.Blurred.Placeholder.Background(th.P.Surface2)
 	ti.SetStyles(styles)
 	return selector{th: th, input: ti}
 }
@@ -205,22 +209,23 @@ func (s selector) View(width, height int) string {
 	b.WriteString(s.input.View())
 	if !compact {
 		b.WriteString("\n")
-		b.WriteString(s.th.Rule.Render(strings.Repeat("─", inner)))
+		b.WriteString(s.th.Modal(s.th.Rule).Render(strings.Repeat("─", inner)))
 	}
 
 	visible := selectorVisibleRows(height)
 	if visible > 0 {
 		b.WriteString("\n")
 	}
+	dimStyle := s.th.Modal(s.th.Dim)
 	switch {
 	case visible == 0:
 	case s.loading:
-		b.WriteString(s.th.Dim.Render("  loading…"))
+		b.WriteString(dimStyle.Render("  loading…"))
 	case len(s.match) == 0:
 		if s.freeform && s.input.Value() != "" {
-			b.WriteString(s.th.Dim.Render("  press enter to use “" + s.input.Value() + "”"))
+			b.WriteString(dimStyle.Render("  press enter to use “" + s.input.Value() + "”"))
 		} else {
-			b.WriteString(s.th.Dim.Render("  no matches"))
+			b.WriteString(dimStyle.Render("  no matches"))
 		}
 	default:
 		offset := s.offset
@@ -247,7 +252,7 @@ func (s selector) View(width, height int) string {
 		}
 	}
 
-	box := border.Width(boxW).Render(b.String())
+	box := border.Width(boxW).Render(s.th.PaintModal(b.String()))
 	return box
 }
 

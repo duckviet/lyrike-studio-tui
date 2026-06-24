@@ -1,0 +1,30 @@
+# flyctl launch added from .gitignore
+**/.DS_Store
+
+# Go build and test artifacts
+bin
+dist
+**/*.test
+**/coverage.out
+
+# Local runtime state
+.cache
+media
+transcripts
+peaks
+drafts
+**/*.sock
+
+# ULW and agent evidence are local execution artifacts.
+.omo/evidence
+
+# Built binary at repo root
+lyrike-studio-tui
+
+**/.env
+
+
+# flyctl launch added from .serena/.gitignore
+.serena/cache
+.serena/project.local.yml
+fly.toml

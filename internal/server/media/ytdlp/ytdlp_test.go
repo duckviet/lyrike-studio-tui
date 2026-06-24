@@ -130,8 +130,8 @@ func TestBuildFetchArgs(t *testing.T) {
 				t.Errorf("missing flag %q in fetch args: %v", f, got)
 			}
 		}
-		if hasFlag(got, "--cookies-file") {
-			t.Errorf("did not expect --cookies-file when cookies file is missing: %v", got)
+		if hasFlag(got, "--cookies") {
+			t.Errorf("did not expect --cookies when cookies file is missing: %v", got)
 		}
 
 		extractorArgs := argValues(got, "--extractor-args")
@@ -180,12 +180,12 @@ func TestBuildFetchArgs(t *testing.T) {
 		cmd := exec.Command("yt-dlp", args...)
 		got := cmd.Args
 
-		val, ok := argValue(got, "--cookies-file")
+		val, ok := argValue(got, "--cookies")
 		if !ok {
-			t.Fatalf("expected --cookies-file in args, got %v", got)
+			t.Fatalf("expected --cookies in args, got %v", got)
 		}
 		if val != cookiePath {
-			t.Errorf("expected --cookies-file %q, got %q", cookiePath, val)
+			t.Errorf("expected --cookies %q, got %q", cookiePath, val)
 		}
 	})
 }

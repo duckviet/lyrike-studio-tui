@@ -71,10 +71,11 @@ func NewServer(cfg *Config, store *cache.Store, manager *transcription.Manager, 
 // Routes returns the configured chi router.
 func (s *Server) Routes() chi.Router {
 	r := chi.NewRouter()
+	r.Use(chimiddleware.RequestID)
+	r.Use(chimiddleware.Logger)
 	r.Use(sm.NewCORS(s.cfg.FrontendURL).Handler)
 	r.Use(sm.NewRateLimiter().Handler)
 	r.Use(chimiddleware.Recoverer)
-	r.Use(chimiddleware.RequestID)
 
 	r.Get("/", s.health)
 	r.Head("/", s.health)

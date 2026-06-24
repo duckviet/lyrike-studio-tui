@@ -96,10 +96,12 @@ func renderFetchInput(f fetchInput, width int, height int, th Theme) string {
 
 	var content strings.Builder
 	content.WriteString(th.ModalTitle.Render("Fetch Media") + "\n\n")
-	content.WriteString(th.Text.Render("YouTube URL or video ID:") + "\n")
+	content.WriteString(th.Modal(th.Text).Render("YouTube URL or video ID:") + "\n")
 	content.WriteString(f.input.View() + "\n\n")
-	content.WriteString(th.FooterKey.Render("Enter") + " " + th.FooterDesc.Render("fetch") + "   " +
-		th.FooterKey.Render("Esc") + " " + th.FooterDesc.Render("cancel"))
+	keyStyle := th.Modal(th.FooterKey)
+	descStyle := th.Modal(th.FooterDesc)
+	content.WriteString(keyStyle.Render("Enter") + " " + descStyle.Render("fetch") + "   " +
+		keyStyle.Render("Esc") + " " + descStyle.Render("cancel"))
 
 	return overlayBlock(content.String(), boxWidth, th)
 }

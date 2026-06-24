@@ -199,6 +199,8 @@ func TestWriteCookiesFromEnv_Base64(t *testing.T) {
 	raw := "# Netscape HTTP Cookie File\n" +
 		".youtube.com\tTRUE\t/\tTRUE\t0\tCONSENT\tYES+cb\n" +
 		".youtube.com\tTRUE\t/\tTRUE\t0\tSID\ttest-sid-value\n"
+	
+	// Test standard clean base64
 	encoded := base64.StdEncoding.EncodeToString([]byte(raw))
 	t.Setenv("YOUTUBE_COOKIES", encoded)
 
@@ -213,6 +215,31 @@ func TestWriteCookiesFromEnv_Base64(t *testing.T) {
 	}
 	if string(got) != raw {
 		t.Errorf("cookie file content mismatch.\n got: %q\nwant: %q", string(got), raw)
+	}
+
+	// Test base64 with newlines and spaces, and missing padding (raw encoding)
+	// We'll manually insert spaces/newlines and strip trailing padding '='
+	dirtyEncoded := ""
+	for i, c := range encoded {
+		if c == '=' {
+			continue // strip padding
+		}
+		dirtyEncoded += string(c)
+		if i%10 == 0 {
+			dirtyEncoded += "\n " // add newline and space
+		}
+	}
+	t.Setenv("YOUTUBE_COOKIES", dirtyEncoded)
+	path2 := filepath.Join(t.TempDir(), "yt_cookies_dirty.txt")
+	if err := WriteCookiesFromEnv(path2); err != nil {
+		t.Fatalf("WriteCookiesFromEnv() dirty returned error: %v", err)
+	}
+	got2, err := os.ReadFile(path2)
+	if err != nil {
+		t.Fatalf("read %s: %v", path2, err)
+	}
+	if string(got2) != raw {
+		t.Errorf("dirty cookie file content mismatch.\n got: %q\nwant: %q", string(got2), raw)
 	}
 }
 

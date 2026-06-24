@@ -124,7 +124,7 @@ func BuildFetchArgs(url string) []string {
 		"--add-header", "Accept-Language:en-US,en;q=0.9",
 	}
 	if _, err := os.Stat(YouTubeCookiesPath); err == nil {
-		args = append(args, "--cookies-file", YouTubeCookiesPath)
+		args = append(args, "--cookies", YouTubeCookiesPath)
 	}
 	args = append(args, "--dump-json", url)
 	return args
@@ -147,7 +147,7 @@ func BuildDownloadArgs(url, videoID, cacheDir string) []string {
 		"--user-agent", smartTVUserAgent,
 	}
 	if _, err := os.Stat(YouTubeCookiesPath); err == nil {
-		args = append(args, "--cookies-file", YouTubeCookiesPath)
+		args = append(args, "--cookies", YouTubeCookiesPath)
 	}
 	args = append(args, url)
 	return args

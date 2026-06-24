@@ -113,8 +113,27 @@ func WriteCookiesFromEnv(path string) error {
 	// plausibly encoded. Short-circuits on '#' to preserve any raw cookie
 	// file the user dropped in via env.
 	if !strings.HasPrefix(content, "#") && len(content) > 20 {
-		if decoded, err := base64.StdEncoding.DecodeString(content); err == nil {
+		// Clean the base64 string of any whitespace/newlines
+		cleaned := strings.Map(func(r rune) rune {
+			if r == '\n' || r == '\r' || r == ' ' || r == '\t' {
+				return -1
+			}
+			return r
+		}, content)
+		// Try standard decoding with padding first
+		if decoded, err := base64.StdEncoding.DecodeString(cleaned); err == nil {
 			content = string(decoded)
+		} else if decoded, err := base64.RawStdEncoding.DecodeString(cleaned); err == nil {
+			content = string(decoded)
+		} else {
+			// If cleaning still failed but the string has missing padding, let's pad it
+			padLen := len(cleaned) % 4
+			if padLen > 0 {
+				cleaned += strings.Repeat("=", 4-padLen)
+				if decoded, err := base64.StdEncoding.DecodeString(cleaned); err == nil {
+					content = string(decoded)
+				}
+			}
 		}
 	}
 
@@ -122,6 +141,16 @@ func WriteCookiesFromEnv(path string) error {
 	if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
 		return fmt.Errorf("write cookies to %s: %w", path, err)
 	}
+	
+	snippet := ""
+	if len(content) > 0 {
+		snippetLen := 30
+		if len(content) < snippetLen {
+			snippetLen = len(content)
+		}
+		snippet = content[:snippetLen]
+	}
+	fmt.Printf("[CONFIG] YouTube cookies successfully written to %s (size: %d bytes, prefix: %q)\n", path, len(content), snippet)
 	return nil
 }
 

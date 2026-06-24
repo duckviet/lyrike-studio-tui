@@ -54,8 +54,8 @@ func Test_FocusAdvances_when_TabIsPressed(t *testing.T) {
 		t.Fatalf("after second Tab expected editor focus, got %d", m.focus)
 	}
 	m = updateModel(t, m, keyPress(tea.KeyTab, 0))
-	if m.focus != focusMedia {
-		t.Fatalf("after third Tab expected wrap to media focus, got %d", m.focus)
+	if m.focus != focusWaveform {
+		t.Fatalf("after third Tab expected wrap to waveform focus, got %d", m.focus)
 	}
 }
 

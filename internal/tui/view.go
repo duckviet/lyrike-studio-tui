@@ -95,34 +95,39 @@ func renderPublishOverlay(p publish.Panel, width, height int, th Theme) string {
 	}
 
 	var sb strings.Builder
-	titleStyle := th.Title
-	keyStyle := th.FooterKey
-	footerDescStyle := th.FooterDesc
+	titleStyle := th.Modal(th.Title)
+	keyStyle := th.Modal(th.FooterKey)
+	footerDescStyle := th.Modal(th.FooterDesc)
+	textStyle := th.Modal(th.Text)
+	dimStyle := th.Modal(th.Dim)
+	valueStyle := th.Modal(th.Value)
+	goodStyle := th.Modal(th.Good)
+	badStyle := th.Modal(th.Bad)
 
 	sb.WriteString(titleStyle.Render("Publishing Lyrics to LRCLIB") + "\n\n")
 	switch p.State() {
 	case publish.StateConfirm:
-		sb.WriteString(th.Text.Render("Are you sure you want to publish lyrics?") + "\n\n")
-		sb.WriteString(fmt.Sprintf("  %s %s\n", th.Dim.Render("Track:"), th.Value.Render(p.TrackName())))
-		sb.WriteString(fmt.Sprintf("  %s %s\n\n", th.Dim.Render("Artist:"), th.Value.Render(p.ArtistName())))
+		sb.WriteString(textStyle.Render("Are you sure you want to publish lyrics?") + "\n\n")
+		sb.WriteString(fmt.Sprintf("  %s %s\n", dimStyle.Render("Track:"), valueStyle.Render(p.TrackName())))
+		sb.WriteString(fmt.Sprintf("  %s %s\n\n", dimStyle.Render("Artist:"), valueStyle.Render(p.ArtistName())))
 		sb.WriteString(keyStyle.Render("y") + " " + footerDescStyle.Render("confirm & publish") + "   " +
 			keyStyle.Render("Esc") + " " + footerDescStyle.Render("cancel"))
 	case publish.StateValidate:
-		sb.WriteString(th.Text.Render("  [ ] Validating lyrics...") + "\n")
+		sb.WriteString(textStyle.Render("  [ ] Validating lyrics...") + "\n")
 	case publish.StatePoW:
-		sb.WriteString(th.Good.Render("  [x] Lyrics validated") + "\n")
-		sb.WriteString(th.Text.Render("  [>] Requesting challenge & solving PoW...") + "\n")
+		sb.WriteString(goodStyle.Render("  [x] Lyrics validated") + "\n")
+		sb.WriteString(textStyle.Render("  [>] Requesting challenge & solving PoW...") + "\n")
 	case publish.StatePublish:
-		sb.WriteString(th.Good.Render("  [x] Lyrics validated") + "\n")
-		sb.WriteString(th.Good.Render("  [x] Proof-of-work solved") + "\n")
-		sb.WriteString(th.Text.Render("  [>] Submitting to LRCLIB...") + "\n")
+		sb.WriteString(goodStyle.Render("  [x] Lyrics validated") + "\n")
+		sb.WriteString(goodStyle.Render("  [x] Proof-of-work solved") + "\n")
+		sb.WriteString(textStyle.Render("  [>] Submitting to LRCLIB...") + "\n")
 	case publish.StateDone:
-		sb.WriteString(th.Good.Render("  [x] Lyrics validated") + "\n")
-		sb.WriteString(th.Good.Render("  [x] Proof-of-work solved") + "\n")
-		sb.WriteString(th.Good.Render("  [x] Published successfully!") + "\n\n")
+		sb.WriteString(goodStyle.Render("  [x] Lyrics validated") + "\n")
+		sb.WriteString(goodStyle.Render("  [x] Proof-of-work solved") + "\n")
+		sb.WriteString(goodStyle.Render("  [x] Published successfully!") + "\n\n")
 		sb.WriteString(keyStyle.Render("Enter") + " " + footerDescStyle.Render("return to editor"))
 	case publish.StateFailed:
-		sb.WriteString(th.Bad.Render(fmt.Sprintf("  [!] Error: %v", p.Err())) + "\n\n")
+		sb.WriteString(badStyle.Render(fmt.Sprintf("  [!] Error: %v", p.Err())) + "\n\n")
 		sb.WriteString(keyStyle.Render("r") + " " + footerDescStyle.Render("retry") + "   " +
 			keyStyle.Render("Esc") + " " + footerDescStyle.Render("return to editor"))
 	}
@@ -142,7 +147,7 @@ func renderMediaPanel(p media.Panel, width, height int, focused bool, th Theme) 
 	rows = append([]string{p.Title}, rows...)
 	rows = fitRows(rows, contentHeight, contentWidth)
 
-	return renderBox(style, width, rows)
+	return renderBox(style, width, rows, th)
 }
 
 func renderWaveformPanel(p waveform.Panel, width, height int, focused bool, th Theme) string {
@@ -157,7 +162,7 @@ func renderWaveformPanel(p waveform.Panel, width, height int, focused bool, th T
 	rows = append([]string{p.Title}, rows...)
 	rows = fitRows(rows, contentHeight, contentWidth)
 
-	return renderBox(style, width, rows)
+	return renderBox(style, width, rows, th)
 }
 
 func renderLyricsPanel(p editor.Panel, width, height int, focused bool, th Theme) string {
@@ -172,7 +177,7 @@ func renderLyricsPanel(p editor.Panel, width, height int, focused bool, th Theme
 	rows = append([]string{p.Title}, rows...)
 	rows = fitRows(rows, contentHeight, contentWidth)
 
-	return renderBox(style, width, rows)
+	return renderBox(style, width, rows, th)
 }
 
 func renderPublishPanel(p publish.Panel, width, height int, focused bool, th Theme) string {
@@ -186,13 +191,15 @@ func renderPublishPanel(p publish.Panel, width, height int, focused bool, th The
 	rows := strings.Split(p.View(contentWidth, contentHeight), "\n")
 	rows = fitRows(rows, contentHeight, contentWidth)
 
-	return renderBox(style, width, rows)
+	return renderBox(style, width, rows, th)
 }
 
-func renderBox(style lipgloss.Style, width int, rows []string) string {
+func renderBox(style lipgloss.Style, width int, rows []string, th Theme) string {
+	content := strings.Join(rows, "\n")
+	painted := th.PaintPane(content)
 	return style.
 		Width(width).
-		Render(strings.Join(rows, "\n"))
+		Render(painted)
 }
 
 func fitRows(rows []string, maxRows, maxWidth int) []string {

@@ -23,7 +23,8 @@ func overlayBlock(content string, width int, th Theme) string {
 	if width < 0 {
 		width = 0
 	}
-	return th.ModalBorder.Width(width).Render(content)
+	painted := th.PaintModal(content)
+	return th.ModalBorder.Width(width).Render(painted)
 }
 
 func overlayCenter(base, box string, width, height int) string {
