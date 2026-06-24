@@ -135,13 +135,9 @@ func TestBuildFetchArgs(t *testing.T) {
 		}
 
 		extractorArgs := argValues(got, "--extractor-args")
-		wantPlayerClient := "youtube:player_client=tv,android,mweb,web"
-		wantPlayerSkip := "youtube:player_skip=web"
-		if !slices.Contains(extractorArgs, wantPlayerClient) {
-			t.Errorf("expected --extractor-args %q in %v", wantPlayerClient, extractorArgs)
-		}
-		if !slices.Contains(extractorArgs, wantPlayerSkip) {
-			t.Errorf("expected --extractor-args %q in %v", wantPlayerSkip, extractorArgs)
+		wantPlayerArgs := "youtube:player_client=tv,web_safari,default"
+		if !slices.Contains(extractorArgs, wantPlayerArgs) {
+			t.Errorf("expected --extractor-args %q in %v", wantPlayerArgs, extractorArgs)
 		}
 
 		if val, ok := argValue(got, "--source-address"); !ok || val != "0.0.0.0" {
@@ -216,20 +212,9 @@ func TestBuildDownloadArgs(t *testing.T) {
 	}
 
 	extractorArgs := argValues(got, "--extractor-args")
-	wantPlayerClient := "youtube:player_client=tv,android,mweb"
-	if !slices.Contains(extractorArgs, wantPlayerClient) {
-		t.Errorf("expected --extractor-args %q in %v", wantPlayerClient, extractorArgs)
-	}
-	// Download MUST NOT include the fetch-only "web" client.
-	forbiddenClient := "youtube:player_client=tv,android,mweb,web"
-	if slices.Contains(extractorArgs, forbiddenClient) {
-		t.Errorf("download args must not include fetch-only client list %q", forbiddenClient)
-	}
-	// Download MUST NOT include player_skip (fetch-only flag).
-	for _, e := range extractorArgs {
-		if e == "youtube:player_skip=web" {
-			t.Errorf("download args must not include player_skip=web: %v", extractorArgs)
-		}
+	wantExtractorArgs := "youtube:player_client=tv,android,mweb,web;player_skip=web"
+	if !slices.Contains(extractorArgs, wantExtractorArgs) {
+		t.Errorf("expected --extractor-args %q in %v", wantExtractorArgs, extractorArgs)
 	}
 
 	if val, ok := argValue(got, "--source-address"); !ok || val != "0.0.0.0" {

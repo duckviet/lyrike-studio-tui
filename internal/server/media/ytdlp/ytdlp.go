@@ -116,8 +116,7 @@ func BuildFetchArgs(url string) []string {
 		"--no-playlist",
 		"--skip-download",
 		"--no-check-certificate",
-		"--extractor-args", "youtube:player_client=tv,android,mweb,web",
-		"--extractor-args", "youtube:player_skip=web",
+        "--extractor-args", "youtube:player_client=tv,web_safari,default",
 		"--source-address", "0.0.0.0",
 		"--user-agent", smartTVUserAgent,
 		"--add-header", "Accept:*/*",
@@ -142,7 +141,7 @@ func BuildDownloadArgs(url, videoID, cacheDir string) []string {
 		"yt-dlp",
 		"--format", "bestaudio[ext=m4a]/bestaudio/best",
 		"--output", outtmpl,
-		"--extractor-args", "youtube:player_client=tv,android,mweb",
+		"--extractor-args", "youtube:player_client=tv,android,mweb,web;player_skip=web",
 		"--source-address", "0.0.0.0",
 		"--user-agent", smartTVUserAgent,
 	}

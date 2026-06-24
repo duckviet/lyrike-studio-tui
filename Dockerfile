@@ -10,6 +10,7 @@ RUN GOOS=linux go build -o lyrike-studio-tui ./cmd/lyrike-studio-tui
 # Stage 2: Runtime
 FROM debian:bookworm-slim
 RUN apt-get update && apt-get install -y --no-install-recommends ffmpeg ca-certificates curl python3 && rm -rf /var/lib/apt/lists/*
+COPY --from=denoland/deno:bin /deno /usr/local/bin/deno
 RUN curl -L -o /usr/local/bin/yt-dlp https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp && chmod +x /usr/local/bin/yt-dlp
 COPY --from=builder /src/lyrike-studio-tui /usr/local/bin/lyrike-studio-tui
 WORKDIR /data

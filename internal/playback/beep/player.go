@@ -89,7 +89,7 @@ func NewPlayer(filePath string) (*Player, error) {
 		p.cleanup()
 		return nil, fmt.Errorf("decode wav: %w", err)
 	}
-	p.streamer = streamer
+	p.streamer = &permanentStreamer{streamer: streamer}
 	p.format = format
 
 	// Calculate duration
@@ -108,7 +108,7 @@ func NewPlayer(filePath string) (*Player, error) {
 		return nil, fmt.Errorf("init speaker: %w", speakerInitErr)
 	}
 
-	p.ctrl = &beep.Ctrl{Streamer: streamer, Paused: true}
+	p.ctrl = &beep.Ctrl{Streamer: p.streamer, Paused: true}
 	speaker.Play(p.ctrl)
 
 	return p, nil
@@ -133,6 +133,7 @@ func (p *Player) Snapshot() playback.Snapshot {
 
 	// Auto-pause at the end of track
 	if posSamples >= p.streamer.Len() && !isPaused {
+		logMsg("[beep] auto-pause triggered: posSamples=%d, Len=%d, isPaused=%t", posSamples, p.streamer.Len(), isPaused)
 		speaker.Lock()
 		p.ctrl.Paused = true
 		speaker.Unlock()
@@ -147,10 +148,12 @@ func (p *Player) Snapshot() playback.Snapshot {
 }
 
 func (p *Player) Play() (playback.Snapshot, error) {
+	logMsg("[beep] Play called: Position=%d, Len=%d", p.streamer.Position(), p.streamer.Len())
 	if p.ctrl != nil {
 		speaker.Lock()
 		// If we're at the end, wrap around to start
 		if p.streamer.Position() >= p.streamer.Len() {
+			logMsg("[beep] Play wrap-around seek to 0 triggered")
 			_ = p.streamer.Seek(0)
 		}
 		p.ctrl.Paused = false
@@ -169,6 +172,7 @@ func (p *Player) Pause() (playback.Snapshot, error) {
 }
 
 func (p *Player) Seek(pos playback.Position) (playback.Snapshot, error) {
+	logMsg("[beep] Seek called: targetMS=%d", pos.Milliseconds())
 	if p.streamer == nil {
 		return p.Snapshot(), fmt.Errorf("no active stream")
 	}
@@ -184,6 +188,8 @@ func (p *Player) Seek(pos playback.Position) (playback.Snapshot, error) {
 	speaker.Lock()
 	err := p.streamer.Seek(samples)
 	speaker.Unlock()
+
+	logMsg("[beep] Seek completed: samples=%d, Position=%d, err=%v", samples, p.streamer.Position(), err)
 
 	if err != nil {
 		return p.Snapshot(), fmt.Errorf("seek failed: %w", err)
@@ -235,4 +241,51 @@ func (p *Player) cleanup() {
 func isHTTPURL(s string) bool {
 	u, err := url.Parse(s)
 	return err == nil && (u.Scheme == "http" || u.Scheme == "https")
+}
+
+type permanentStreamer struct {
+	streamer beep.StreamSeekCloser
+}
+
+func (s *permanentStreamer) Stream(samples [][2]float64) (n int, ok bool) {
+	n, ok = s.streamer.Stream(samples)
+	if !ok || n < len(samples) {
+		// Log only on first transition or occasionally to avoid spam
+		logMsg("[beep] permanentStreamer Stream EOF met: n=%d, ok=%t, Position=%d, Len=%d", n, ok, s.streamer.Position(), s.streamer.Len())
+		// Instead of returning ok=false (which drains the streamer from the speaker),
+		// we return ok=true and fill the rest of the buffer with silence (zeros).
+		for i := n; i < len(samples); i++ {
+			samples[i] = [2]float64{0, 0}
+		}
+		return len(samples), true
+	}
+	return n, true
+}
+
+func (s *permanentStreamer) Err() error {
+	return s.streamer.Err()
+}
+
+func (s *permanentStreamer) Len() int {
+	return s.streamer.Len()
+}
+
+func (s *permanentStreamer) Position() int {
+	return s.streamer.Position()
+}
+
+func (s *permanentStreamer) Seek(pos int) error {
+	return s.streamer.Seek(pos)
+}
+
+func (s *permanentStreamer) Close() error {
+	return s.streamer.Close()
+}
+
+func logMsg(format string, args ...any) {
+	f, err := os.OpenFile("/tmp/lyrike-player.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	if err == nil {
+		fmt.Fprintf(f, format+"\n", args...)
+		f.Close()
+	}
 }

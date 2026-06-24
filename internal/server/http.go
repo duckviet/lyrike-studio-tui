@@ -320,7 +320,7 @@ func (s *Server) audio(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusNotFound, "audio_not_found", "audio not found")
 		return
 	}
-	serveAudioFile(w, r, audioPath, "audio/mpeg")
+	serveAudioFile(w, r, audioPath, audioContentType(audioPath))
 }
 
 func (s *Server) peaks(w http.ResponseWriter, r *http.Request) {

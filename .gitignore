@@ -22,3 +22,7 @@ coverage.out
 
 .env
 
+*.cookies.txt
+cookies.txt
+cookies.b64
+.cache/cookies/

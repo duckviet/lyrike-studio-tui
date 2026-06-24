@@ -3,6 +3,7 @@ package tui
 import (
 	"context"
 	"fmt"
+	"io"
 	"strings"
 
 	tea "charm.land/bubbletea/v2"
@@ -91,14 +92,26 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if m.artistName == "" || m.artistName == "Unknown Artist" {
 			m.artistName = msg.resp.ArtistName
 		}
-		if fp, ok := m.player.(*playback.FakePlayer); ok {
+		var playerStatus string
+		if m.playerFactory != nil {
+			if closer, ok := m.player.(io.Closer); ok {
+				_ = closer.Close()
+			}
+			newPlayer, status := m.playerFactory(msg.resp.VideoID)
+			m.player = newPlayer
+			playerStatus = status
+		} else if fp, ok := m.player.(*playback.FakePlayer); ok {
 			if dur, err := playback.NewDuration(int64(msg.resp.Duration) * 1000); err == nil {
 				fp.SetDuration(dur)
 			}
 		}
 		m.media = m.media.WithMetadata(m.trackName, m.artistName, m.albumName).
 			WithTransport(media.TransportPaused, 0, int64(msg.resp.Duration)*1000)
-		m.setStatus("fetch complete")
+		if playerStatus != "" {
+			m.setStatus("fetch complete | " + playerStatus)
+		} else {
+			m.setStatus("fetch complete")
+		}
 		return m, func() tea.Msg {
 			resp, err := m.client.Peaks(context.Background(), msg.resp.VideoID, backend.SourceOriginal, 2000)
 			return fetchPeaksMsg{resp: resp, err: err}
